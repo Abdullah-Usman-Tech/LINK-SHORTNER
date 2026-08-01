@@ -4,13 +4,17 @@ import CopyButton from "../shared/CopyButton.jsx";
 import { ExternalLinkIcon, TrashIcon } from "../../icons/index.jsx";
 import { formatClicks, timeAgo } from "../../utils/analytics.js";
 
-export default function LinkRow({ link, onDelete }) {
+export default function LinkRow({ link, onDelete, onViewTimeline }) {
   const [deleting, setDeleting] = useState(false);
 
   const handleDelete = () => {
     setDeleting(true);
     deleteLink(link.shortUrl)
       .then(() => onDelete(link._id))
+      .catch((err) => {
+        console.error("Failed to delete link:", err);
+        alert(err.response?.data?.message || "Failed to delete link.");
+      })
       .finally(() => setDeleting(false));
   };
 
@@ -54,9 +58,25 @@ export default function LinkRow({ link, onDelete }) {
                 style={{ width: `${barWidth}%` }}
               />
             </div>
-            <span className="text-xs font-medium text-gray-500 shrink-0">
-              {formatClicks(link.clicks)} clicks
-            </span>
+            <button
+              onClick={() => onViewTimeline && onViewTimeline(link)}
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-gray-100 hover:bg-gray-900 text-gray-700 hover:text-white transition-all text-xs font-semibold shrink-0 cursor-pointer group shadow-xs hover:shadow-sm"
+              title="Click to view view timeline"
+            >
+              <svg
+                className="w-3.5 h-3.5 text-gray-500 group-hover:text-white transition-colors"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+              <span>{formatClicks(link.clicks)} views</span>
+            </button>
           </div>
         </div>
 

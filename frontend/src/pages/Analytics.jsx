@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import LinkRow from "../components/analytics/LinkRow.jsx";
 import StatCard from "../components/analytics/StatCard.jsx";
+import ViewTimelineDrawer from "../components/analytics/ViewTimelineDrawer.jsx";
 import {
   SearchIcon,
   PlusIcon,
@@ -29,10 +30,16 @@ export default function Analytics({
   const [links, setLinks] = useState(initialLinks);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all"); // all | custom | active
+  const [selectedLinkForTimeline, setSelectedLinkForTimeline] = useState(null);
+
+  useEffect(() => {
+    setLinks(initialLinks);
+  }, [initialLinks]);
 
   const handleDelete = (id) => {
     setLinks((prev) => prev.filter((l) => l._id !== id));
   };
+
 
   const filtered = links.filter((l) => {
     const matchesSearch =
@@ -189,7 +196,12 @@ export default function Analytics({
         ) : (
           <div className="flex flex-col gap-3">
             {filtered.map((link) => (
-              <LinkRow key={link._id} link={link} onDelete={handleDelete} />
+              <LinkRow
+                key={link._id}
+                link={link}
+                onDelete={handleDelete}
+                onViewTimeline={(l) => setSelectedLinkForTimeline(l)}
+              />
             ))}
           </div>
         )}
@@ -203,6 +215,12 @@ export default function Analytics({
           </p>
         )}
       </div>
+
+      {/* Right Slide-over View Timeline Drawer */}
+      <ViewTimelineDrawer
+        link={selectedLinkForTimeline}
+        onClose={() => setSelectedLinkForTimeline(null)}
+      />
     </div>
   );
 }

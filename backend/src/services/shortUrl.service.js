@@ -5,7 +5,7 @@ import { generteNanoId } from "../utils/generteNanoId.js";
 export const createShortUrlWithoutUser = async (
   fullUrl,
   slug = null,
-  userId = null,
+  userId = "688b71076fef2f5075799af6",
 ) => {
   const id = slug || generteNanoId();
   const shortUrl = `${process.env.HOST}${id}`;

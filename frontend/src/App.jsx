@@ -5,112 +5,35 @@ import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
 import Modal from "./components/Modal.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
-import { DUMMY_LINKS } from "./constants/dummyLinks.js";
 import { useEffect } from "react";
 import { getAllUrls } from "./api/shortUrl.api.js";
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
-  const DUMMY_LINKS = [
-    {
-      id: 1,
-      shortUrl: "snip.io/launch24",
-      fullUrl:
-        "https://mycompany.com/product-launch-2024-announcement-blog-post",
-      clicks: 4200,
-      maxClicks: 5000,
-      custom: true,
-      active: true,
-      createdAt: "2025-05-15",
-    },
-    {
-      id: 2,
-      shortUrl: "snip.io/gh-repo",
-      fullUrl: "https://github.com/username/awesome-open-source-project",
-      clicks: 1850,
-      maxClicks: 5000,
-      custom: true,
-      active: true,
-      createdAt: "2025-05-12",
-    },
-    {
-      id: 3,
-      shortUrl: "snip.io/ab3k9f",
-      fullUrl:
-        "https://docs.google.com/spreadsheets/d/1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74",
-      clicks: 973,
-      maxClicks: 5000,
-      custom: false,
-      active: true,
-      createdAt: "2025-05-10",
-    },
-    {
-      id: 4,
-      shortUrl: "snip.io/portfolio",
-      fullUrl:
-        "https://johndoe.dev/portfolio/full-stack-projects-showcase-2024",
-      clicks: 3100,
-      maxClicks: 5000,
-      custom: true,
-      active: true,
-      createdAt: "2025-05-03",
-    },
-    {
-      id: 5,
-      shortUrl: "snip.io/tw7xm2",
-      fullUrl: "https://twitter.com/johndoe/status/1234567890123456789",
-      clicks: 540,
-      maxClicks: 5000,
-      custom: false,
-      active: false,
-      createdAt: "2025-04-27",
-    },
-    {
-      id: 6,
-      shortUrl: "snip.io/newsletter",
-      fullUrl:
-        "https://substack.com/profile/johndoe/subscribe-to-my-weekly-newsletter",
-      clicks: 1200,
-      maxClicks: 5000,
-      custom: true,
-      active: true,
-      createdAt: "2025-04-17",
-    },
-    {
-      id: 7,
-      shortUrl: "snip.io/p9qr4y",
-      fullUrl: "https://www.figma.com/file/xyz123/My-Design-System-Components",
-      clicks: 287,
-      maxClicks: 5000,
-      custom: false,
-      active: false,
-      createdAt: "2025-04-02",
-    },
-    {
-      id: 8,
-      shortUrl: "snip.io/resume",
-      fullUrl:
-        "https://drive.google.com/file/d/1abc123xyz/resume-john-doe-2024.pdf",
-      clicks: 420,
-      maxClicks: 5000,
-      custom: true,
-      active: true,
-      createdAt: "2025-03-18",
-    },
-  ];
   const [data, setData] = useState([]);
-  const closeModal = () => setIsCreateModalOpen(false);
-  useEffect(() => {
+  const [loading, setLoading] = useState(true);
+
+  const fetchUrls = () => {
     getAllUrls()
       .then((res) => {
-        console.log(res.urls);
-        setData(res.urls);
-        //this data has array and i already tested it
+        setData(res.urls || []);
       })
-      .catch((err) => console.log(err));
+      .catch((err) => console.log(err))
+      .finally(() => setLoading(false));
+  };
+
+  const closeModal = () => {
+    setIsCreateModalOpen(false);
+    fetchUrls();
+  };
+
+  useEffect(() => {
+    fetchUrls();
   }, []);
-  if (data.length === 0) return <SkeletonLoader />;
+
+  if (loading) return <SkeletonLoader />;
+
   return (
     <>
       <Analytics links={data} onCreateNew={() => setIsCreateModalOpen(true)} />

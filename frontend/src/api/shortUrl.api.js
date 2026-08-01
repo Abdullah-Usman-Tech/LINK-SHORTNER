@@ -13,6 +13,8 @@ export const getAllUrls = async () => {
   return res.data;
 };
 
-export const deleteLink = async (fullUrl, slug) => {
-  return "abc";
+export const deleteLink = async (shortUrl) => {
+  const res = await api.delete(`/shortUrl/${encodeURIComponent(shortUrl)}`);
+  return res.data;
 };
+

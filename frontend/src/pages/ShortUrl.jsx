@@ -256,9 +256,9 @@ export default function ShortUrl({ onSuccess }) {
             </div>
             <div className="flex items-center gap-2">
               <div className="flex-1 font-mono text-sm font-semibold text-gray-900 bg-white border border-gray-200 rounded-lg px-3.5 py-2.5 truncate select-all">
-                {`${import.meta.env.VITE_BACKEND_URL}/${result.shortUrl}`}
+                {`${result.shortUrl}`}
               </div>
-              <CopyButton textToCopy={`${import.meta.env.VITE_BACKEND_URL}/${result.shortUrl}`} />
+              <CopyButton textToCopy={`${result.shortUrl}`} />
             </div>
             <p className="mt-2.5 text-xs font-mono text-gray-400 truncate">
               ↳ {result.fullUrl}

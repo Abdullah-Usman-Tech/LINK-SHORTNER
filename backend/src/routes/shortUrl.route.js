@@ -11,6 +11,8 @@ const router = express.Router();
 router.delete("/:shortUrl", deleteUrl);
 router.get("/", allUrls);
 router.post("/", createShortUrl);
-router.post("/custom", authMiddleware, createCustomUrl);
+// router.post("/custom", authMiddleware, createCustomUrl);
+
+router.post("/custom", createCustomUrl);
 
 export default router;

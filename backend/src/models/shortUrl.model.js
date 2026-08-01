@@ -33,6 +33,38 @@ const shortUrlSchema = new mongoose.Schema(
       type: Number,
       default: 5000,
     },
+    viewsHistory: [
+      {
+        timestamp: {
+          type: Date,
+          default: Date.now,
+        },
+        ip: {
+          type: String,
+          default: "127.0.0.1",
+        },
+        userAgent: {
+          type: String,
+          default: "Unknown",
+        },
+        referrer: {
+          type: String,
+          default: "Direct",
+        },
+        browser: {
+          type: String,
+          default: "Chrome",
+        },
+        os: {
+          type: String,
+          default: "Windows",
+        },
+        device: {
+          type: String,
+          default: "Desktop",
+        },
+      },
+    ],
   },
   {
     timestamps: true,
