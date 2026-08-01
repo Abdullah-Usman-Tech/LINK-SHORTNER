@@ -1,6 +1,12 @@
-import { useState, useCallback } from "react";
-import { createCustomUrl, createShortUrl } from "../api/shortUrl.api";
+import { useState, useCallback, useEffect } from "react";
+import {
+  createCustomUrl,
+  createShortUrl,
+  getAllLongUrls,
+  createLongUrl,
+} from "../api/shortUrl.api";
 import CopyButton from "../components/shared/CopyButton.jsx";
+import LongUrlDropdown from "../components/shared/LongUrlDropdown.jsx";
 import { isValidUrl, isValidAlias } from "../utils/validation.js";
 
 const CopyIcon = () => (
@@ -78,11 +84,30 @@ function HistoryItem({ item }) {
 export default function ShortUrl({ onSuccess }) {
   const [url, setUrl] = useState("");
   const [alias, setAlias] = useState("");
+  const [longLinkName, setLongLinkName] = useState("");
+  const [autoSaveLongUrl, setAutoSaveLongUrl] = useState(true);
+  const [savedLongUrls, setSavedLongUrls] = useState([]);
+  const [loadingLongUrls, setLoadingLongUrls] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [aliasError, setAliasError] = useState("");
   const [result, setResult] = useState(null);
   const [history, setHistory] = useState([]);
+
+  // Fetch saved long links on load
+  const fetchLongUrls = useCallback(() => {
+    setLoadingLongUrls(true);
+    getAllLongUrls()
+      .then((res) => {
+        setSavedLongUrls(res.longUrls || []);
+      })
+      .catch((err) => console.error("Failed to load saved long URLs", err))
+      .finally(() => setLoadingLongUrls(false));
+  }, []);
+
+  useEffect(() => {
+    fetchLongUrls();
+  }, [fetchLongUrls]);
 
   const handleShorten = useCallback(() => {
     setError("");
@@ -102,12 +127,17 @@ export default function ShortUrl({ onSuccess }) {
 
     setLoading(true);
 
+    // If autoSaveLongUrl is enabled, save to long links library in parallel/sequence
+    const saveLongUrlPromise = autoSaveLongUrl
+      ? createLongUrl(url.trim(), longLinkName.trim()).then(() => fetchLongUrls())
+      : Promise.resolve();
+
     const apiCall = trimmedAlias
       ? createCustomUrl(url.trim(), trimmedAlias)
       : createShortUrl(url.trim());
 
-    apiCall
-      .then((res) => {
+    Promise.all([apiCall, saveLongUrlPromise])
+      .then(([res]) => {
         const entry = {
           shortUrl: res,
           fullUrl: url.trim(),
@@ -117,7 +147,7 @@ export default function ShortUrl({ onSuccess }) {
         setHistory((prev) => [entry, ...prev].slice(0, 5));
         setUrl("");
         setAlias("");
-        // if (onSuccess) setTimeout(onSuccess, 1500);
+        setLongLinkName("");
       })
       .catch((err) => {
         if (trimmedAlias) {
@@ -133,7 +163,7 @@ export default function ShortUrl({ onSuccess }) {
       .finally(() => {
         setLoading(false);
       });
-  }, [url, alias, onSuccess]);
+  }, [url, alias, autoSaveLongUrl, longLinkName, fetchLongUrls]);
 
   const handleKeyDown = (e) => {
     if (e.key === "Enter") handleShorten();
@@ -162,6 +192,20 @@ export default function ShortUrl({ onSuccess }) {
               Paste any URL and get a short link instantly.
             </p>
           </>
+        )}
+
+        {/* Long Links Dropdown Selector */}
+        {savedLongUrls.length > 0 && (
+          <LongUrlDropdown
+            longUrls={savedLongUrls}
+            isLoading={loadingLongUrls}
+            selectedUrl={url}
+            onSelect={({ name, url: selectedUrl }) => {
+              setUrl(selectedUrl || "");
+              if (name) setLongLinkName(name);
+              setError("");
+            }}
+          />
         )}
 
         {/* URL Input Row */}
@@ -195,6 +239,48 @@ export default function ShortUrl({ onSuccess }) {
 
         {/* URL error */}
         {error && <p className="mt-2 text-xs text-red-500">{error}</p>}
+
+        {/* Long Link Auto-Save Toggle & Optional Name */}
+        <div className="mt-3 p-3 bg-white border border-gray-200/80 rounded-xl space-y-2.5 shadow-xs">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <span className="text-xs font-semibold text-gray-800">
+                Save to Long Links Library
+              </span>
+              <p className="text-[11px] text-gray-400">
+                {autoSaveLongUrl
+                  ? "Saves this target URL to your library for future reuse"
+                  : "Will not save target URL to your library"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setAutoSaveLongUrl(!autoSaveLongUrl)}
+              className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                autoSaveLongUrl ? "bg-violet-600" : "bg-gray-200"
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow-lg ring-0 transition duration-200 ease-in-out ${
+                  autoSaveLongUrl ? "translate-x-4" : "translate-x-0"
+                }`}
+              />
+            </button>
+          </div>
+
+          {autoSaveLongUrl && (
+            <div className="pt-2 border-t border-gray-100">
+              <input
+                type="text"
+                value={longLinkName}
+                onChange={(e) => setLongLinkName(e.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Long Link Name (optional — auto-generates random-xxxx if empty)"
+                className="w-full h-8 px-3 rounded-lg border border-gray-200 bg-gray-50/50 text-xs font-mono text-gray-800 placeholder-gray-400 outline-none focus:border-violet-300 focus:bg-white transition-all"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Custom Alias Row */}
         <div

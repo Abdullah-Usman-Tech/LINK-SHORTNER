@@ -1,15 +1,16 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Analytics from "./pages/Analytics.jsx";
 import ShortUrl from "./pages/ShortUrl.jsx";
 import SignIn from "./pages/SignIn.jsx";
 import SignUp from "./pages/SignUp.jsx";
 import Modal from "./components/Modal.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
-import { useEffect } from "react";
+import CreateLongUrlForm from "./components/shared/CreateLongUrlForm.jsx";
 import { getAllUrls } from "./api/shortUrl.api.js";
 
 function App() {
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
+  const [isCreateLongModalOpen, setIsCreateLongModalOpen] = useState(false);
 
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,14 +37,26 @@ function App() {
 
   return (
     <>
-      <Analytics links={data} onCreateNew={() => setIsCreateModalOpen(true)} />
+      <Analytics
+        links={data}
+        onCreateNew={() => setIsCreateModalOpen(true)}
+        onCreateLongLink={() => setIsCreateLongModalOpen(true)}
+      />
 
       <Modal
         open={isCreateModalOpen}
         onClose={closeModal}
-        title="Create new link"
+        title="Create new short link"
       >
         <ShortUrl onSuccess={closeModal} />
+      </Modal>
+
+      <Modal
+        open={isCreateLongModalOpen}
+        onClose={() => setIsCreateLongModalOpen(false)}
+        title="Save a new Long Link"
+      >
+        <CreateLongUrlForm onSuccess={() => setIsCreateLongModalOpen(false)} />
       </Modal>
     </>
   );
