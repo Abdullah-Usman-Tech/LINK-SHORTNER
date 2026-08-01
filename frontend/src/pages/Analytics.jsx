@@ -24,6 +24,7 @@ export default function Analytics({
   links: initialLinks = [],
   isLoading = false,
   onCreateNew,
+  onCreateLongLink,
   onLogout,
   user = { name: "User", email: "" },
 }) {
@@ -87,13 +88,22 @@ export default function Analytics({
               Hey {user.name.split(" ")[0]}, here's everything you've shortened.
             </p>
           </div>
-          <button
-            onClick={onCreateNew}
-            className="flex items-center gap-1.5 h-10 px-4 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 active:scale-95 transition-all duration-150 cursor-pointer shrink-0"
-          >
-            <PlusIcon />
-            Create new
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={onCreateLongLink}
+              className="flex items-center gap-1.5 h-10 px-3.5 rounded-lg bg-white border border-gray-200 text-gray-800 text-sm font-semibold hover:bg-gray-50 active:scale-95 transition-all duration-150 cursor-pointer shadow-xs"
+            >
+              <PlusIcon />
+              Create long link
+            </button>
+            <button
+              onClick={onCreateNew}
+              className="flex items-center gap-1.5 h-10 px-4 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700 active:scale-95 transition-all duration-150 cursor-pointer"
+            >
+              <PlusIcon />
+              Create new
+            </button>
+          </div>
         </div>
 
         {/* Stat cards */}

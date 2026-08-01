@@ -18,3 +18,18 @@ export const deleteLink = async (shortUrl) => {
   return res.data;
 };
 
+export const getAllLongUrls = async () => {
+  const res = await api.get("/longUrl");
+  return res.data;
+};
+
+export const createLongUrl = async (url, name) => {
+  const res = await api.post("/longUrl", { url, name });
+  return res.data.longUrl;
+};
+
+export const deleteLongUrl = async (id) => {
+  const res = await api.delete(`/longUrl/${id}`);
+  return res.data;
+};
+
