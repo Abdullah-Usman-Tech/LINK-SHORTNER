@@ -7,6 +7,8 @@ import connectDB from "./src/config/db.js";
 import shortUrlRoutes from "./src/routes/shortUrl.route.js";
 import authRoutes from "./src/routes/auth.route.js";
 import longUrlRoutes from "./src/routes/longUrl.route.js";
+import trackedItemRoutes from "./src/routes/trackedItem.route.js";
+import testRoutes from "./src/routes/test.route.js";
 import { redirectFromShortUrl } from "./src/controllers/shortUrl.controller.js";
 
 dotenv.config();
@@ -44,6 +46,8 @@ app.get("/:shortUrl", redirectFromShortUrl);
 app.use("/api/auth", authRoutes);
 app.use("/api/shortUrl", shortUrlRoutes);
 app.use("/api/longUrl", longUrlRoutes);
+app.use("/api/tracked-items", trackedItemRoutes);
+app.use("/api/test", testRoutes);
 
 app.get("/", (req, res) => {
   res.send("Hello World");
