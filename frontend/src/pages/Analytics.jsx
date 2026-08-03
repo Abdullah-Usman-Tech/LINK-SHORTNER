@@ -7,6 +7,7 @@ import JobTrackerCard from "../components/analytics/JobTrackerCard.jsx";
 import JobDetailsDrawer from "../components/analytics/JobDetailsDrawer.jsx";
 import CreateTrackedItemModal from "../components/analytics/CreateTrackedItemModal.jsx";
 import TestTab from "../components/analytics/TestTab.jsx";
+import AutomateApplyTab from "../components/analytics/AutomateApplyTab.jsx";
 import {
   SearchIcon,
   PlusIcon,
@@ -255,8 +256,10 @@ export default function Analytics({
           counts={categoryCounts}
         />
 
-        {/* TAB CONTENT: TEST LAB */}
-        {activeCategory === "test-lab" ? (
+        {/* TAB CONTENT: AUTOMATE APPLY */}
+        {activeCategory === "automate-apply" ? (
+          <AutomateApplyTab onJobTracked={fetchCategoryData} />
+        ) : activeCategory === "test-lab" ? (
           <TestTab />
         ) : (
           <>

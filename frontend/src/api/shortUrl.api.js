@@ -70,8 +70,22 @@ export const verifySmtp = async (params = {}) => {
   return res.data;
 };
 
-export const sendTestEmail = async ({ to, subject, body, isHtml = true, smtpOverrides = {} }) => {
-  const res = await api.post("/test/send-email", { to, subject, body, isHtml, smtpOverrides });
+export const sendTestEmail = async ({
+  to,
+  subject,
+  body,
+  isHtml = true,
+  attachments = [],
+  smtpOverrides = {},
+}) => {
+  const res = await api.post("/test/send-email", {
+    to,
+    subject,
+    body,
+    isHtml,
+    attachments,
+    smtpOverrides,
+  });
   return res.data;
 };
 
@@ -81,6 +95,31 @@ export const tailorResume = async ({ jobDescription, guidelines = "", resumeHtml
     guidelines,
     resumeHtml,
   });
+  return res.data;
+};
+
+export const automateEmailApply = async ({
+  postText = "",
+  postUrl = "",
+  resumeHtml = "",
+  guidelines = "",
+  autoSendEmail = false,
+  smtpOverrides = {},
+  applicantName = "Abdullah Usman",
+}) => {
+  const res = await api.post(
+    "/test/automate-email-apply",
+    {
+      postText,
+      postUrl,
+      resumeHtml,
+      guidelines,
+      autoSendEmail,
+      smtpOverrides,
+      applicantName,
+    },
+    { timeout: 180000 },
+  );
   return res.data;
 };
 
