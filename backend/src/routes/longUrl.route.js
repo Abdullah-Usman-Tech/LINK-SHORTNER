@@ -4,8 +4,11 @@ import {
   getAllLongUrlsController,
   deleteLongUrlController,
 } from "../controllers/longUrl.controller.js";
+import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+router.use(authMiddleware);
 
 router.get("/", getAllLongUrlsController);
 router.post("/", createLongUrlController);

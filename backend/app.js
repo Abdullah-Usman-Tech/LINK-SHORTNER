@@ -10,6 +10,8 @@ import longUrlRoutes from "./src/routes/longUrl.route.js";
 import trackedItemRoutes from "./src/routes/trackedItem.route.js";
 import testRoutes from "./src/routes/test.route.js";
 import { redirectFromShortUrl } from "./src/controllers/shortUrl.controller.js";
+import { ensureOwnerAccountAndMigrateData } from "./src/services/authBootstrap.service.js";
+import Category from "./src/models/category.model.js";
 
 dotenv.config();
 
@@ -55,8 +57,26 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-connectDB().then(
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  }),
-);
+const dropLegacyCategorySlugIndex = async () => {
+  try {
+    await Category.collection.dropIndex("slug_1");
+    console.log("[auth-bootstrap] Dropped legacy Category.slug unique index");
+  } catch (err) {
+    if (err?.codeName !== "IndexNotFound" && err?.code !== 27) {
+      console.warn("[auth-bootstrap] Could not drop slug_1 index:", err.message);
+    }
+  }
+};
+
+connectDB()
+  .then(async () => {
+    await dropLegacyCategorySlugIndex();
+    await ensureOwnerAccountAndMigrateData();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  });

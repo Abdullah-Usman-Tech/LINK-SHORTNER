@@ -31,7 +31,12 @@ export const createJobApplicationFromAutoApply = async ({
   postUrl = "",
   recipientEmail = "",
   sourceMode = "",
+  userId,
 }) => {
+  if (!userId) {
+    throw new Error("userId is required to create a tracked job application");
+  }
+
   const company = String(extracted.company || "").trim();
   const hiringManager = String(extracted.hiringManager || "").trim();
   const applyEmail = String(recipientEmail || extracted.email || "").trim();
@@ -52,6 +57,7 @@ export const createJobApplicationFromAutoApply = async ({
     sourceUrl: String(postUrl || "").trim(),
     status: "Email Sent",
     trackedLinks: [],
+    userId,
   });
 };
 

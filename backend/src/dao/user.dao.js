@@ -1,15 +1,29 @@
 import User from "../models/user.model.js";
 
-export const findUserByEmail = async (email) => {
-  return User.findOne({ email: email });
-  // Implement logic to find a user by email in the database
+const sanitizeUser = (user) => {
+  if (!user) return null;
+  const obj = typeof user.toObject === "function" ? user.toObject() : { ...user };
+  delete obj.password;
+  return obj;
 };
-export const findUserById = async (id) => {
-  return User.findById(id);
+
+export const findUserByEmail = async (email, { includePassword = false } = {}) => {
+  let query = User.findOne({ email: String(email || "").trim().toLowerCase() });
+  if (includePassword) query = query.select("+password");
+  return query;
+};
+
+export const findUserById = async (id, { includePassword = false } = {}) => {
+  let query = User.findById(id);
+  if (includePassword) query = query.select("+password");
+  return query;
 };
 
 export const createUser = async (email, password) => {
-  console.log("Create user:", email, password);
-  // Implement logic to create a new user in the database
-  return User.create({ email, password });
+  return User.create({
+    email: String(email || "").trim().toLowerCase(),
+    password,
+  });
 };
+
+export { sanitizeUser };

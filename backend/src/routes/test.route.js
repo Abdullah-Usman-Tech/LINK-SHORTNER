@@ -5,8 +5,11 @@ import {
   tailorResume,
   automateEmailApply,
 } from "../controllers/test.controller.js";
+import { authMiddleware } from "../middleware/auth.middleware.js";
 
 const router = express.Router();
+
+router.use(authMiddleware);
 
 router.get("/verify-smtp", verifySmtp);
 router.post("/send-email", sendTestEmail);

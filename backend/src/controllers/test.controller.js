@@ -233,6 +233,7 @@ export const automateEmailApply = async (req, res) => {
         postUrl,
         recipientEmail: draft.to,
         sourceMode: sourceMode || "automate-email-apply",
+        userId: req.user._id,
       });
     }
 
