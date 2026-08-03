@@ -1,21 +1,33 @@
-import { findUserById } from "../dao/user.dao.js";
+import { findUserById, sanitizeUser } from "../dao/user.dao.js";
 import { verifyJWT } from "../utils/JWT.js";
 
 export const authMiddleware = async (req, res, next) => {
-  // Check if the user is authenticated
-  const token = req.cookies.token;
+  const token = req.cookies?.token || extractBearerToken(req);
   if (!token) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 
   try {
-    const descodedToken = verifyJWT(token, process.env.JWT_SECRET);
-    const userId = descodedToken.userId;
+    const decoded = verifyJWT(token);
+    const userId = decoded.userId || decoded.userid;
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
     const user = await findUserById(userId);
-    if (!user) return res.status(401).json({ message: "Unauthorized" });
-    req.user = user;
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    req.user = sanitizeUser(user);
     next();
-  } catch (error) {
+  } catch {
     return res.status(401).json({ message: "Unauthorized" });
   }
+};
+
+const extractBearerToken = (req) => {
+  const header = req.headers?.authorization || "";
+  if (!header.startsWith("Bearer ")) return null;
+  return header.slice(7).trim() || null;
 };

@@ -50,6 +50,12 @@ const trackedItemSchema = new mongoose.Schema(
       default: "Applied",
     },
     trackedLinks: [trackedLinkSchema],
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+      index: true,
+    },
   },
   {
     timestamps: true,

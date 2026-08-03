@@ -56,7 +56,6 @@ const passwordRules = [
 ];
 
 export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -69,10 +68,6 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
   const handleSubmit = () => {
     setError("");
 
-    if (!name.trim()) {
-      setError("Name is required.");
-      return;
-    }
     if (!email.trim()) {
       setError("Email is required.");
       return;
@@ -91,7 +86,7 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
     }
 
     setLoading(true);
-    signUp({ name: name.trim(), email: email.trim(), password })
+    signUp({ email: email.trim(), password })
       .then((res) => {
         onSignUpSuccess?.(res);
       })
@@ -108,22 +103,17 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4 py-10">
       <div className="w-full max-w-sm">
-        {/* Brand */}
         <div className="text-center mb-8">
           <p className="text-xs font-medium tracking-widest uppercase text-gray-400 mb-3">
             ✦ <span className="text-gray-700">Snip</span>
           </p>
-          <h1 className="text-2xl font-bold text-gray-900">
-            Create an account
-          </h1>
+          <h1 className="text-2xl font-bold text-gray-900">Create an account</h1>
           <p className="text-sm text-gray-500 mt-1">
-            Start shortening links for free
+            Sign up with email and password
           </p>
         </div>
 
-        {/* Card */}
         <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-sm">
-          {/* Global error */}
           {error && (
             <div className="mb-4 px-3.5 py-2.5 rounded-lg bg-red-50 border border-red-200 text-xs text-red-600">
               {error}
@@ -131,25 +121,6 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
           )}
 
           <div className="flex flex-col gap-4">
-            {/* Name */}
-            <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-gray-600">
-                Full name
-              </label>
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  setError("");
-                }}
-                onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-                placeholder="John Doe"
-                className="h-11 px-3.5 rounded-lg border border-gray-200 bg-gray-50 text-sm text-gray-800 placeholder-gray-300 outline-none focus:border-gray-400 focus:bg-white focus:ring-2 focus:ring-gray-100 transition-all"
-              />
-            </div>
-
-            {/* Email */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-gray-600">Email</label>
               <input
@@ -165,11 +136,8 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
               />
             </div>
 
-            {/* Password */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-gray-600">
-                Password
-              </label>
+              <label className="text-xs font-medium text-gray-600">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
@@ -194,7 +162,6 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
                 </button>
               </div>
 
-              {/* Strength bar */}
               {password && (
                 <div className="mt-1">
                   <div className="flex gap-1 mb-1.5">
@@ -212,7 +179,13 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
                   <p className="text-xs text-gray-400">
                     Strength:{" "}
                     <span
-                      className={`font-medium ${passwordStrength === 3 ? "text-emerald-600" : passwordStrength === 2 ? "text-amber-600" : "text-red-500"}`}
+                      className={`font-medium ${
+                        passwordStrength === 3
+                          ? "text-emerald-600"
+                          : passwordStrength === 2
+                            ? "text-amber-600"
+                            : "text-red-500"
+                      }`}
                     >
                       {strengthLabels[passwordStrength - 1] || "Too weak"}
                     </span>
@@ -220,16 +193,21 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
                 </div>
               )}
 
-              {/* Rules */}
               {(passwordFocused || password) && (
                 <div className="flex flex-col gap-1 mt-1">
                   {passwordRules.map((rule) => (
                     <div
                       key={rule.label}
-                      className={`flex items-center gap-1.5 text-xs transition-colors ${rule.test(password) ? "text-emerald-600" : "text-gray-400"}`}
+                      className={`flex items-center gap-1.5 text-xs transition-colors ${
+                        rule.test(password) ? "text-emerald-600" : "text-gray-400"
+                      }`}
                     >
                       <span
-                        className={`flex items-center justify-center w-3.5 h-3.5 rounded-full border transition-all ${rule.test(password) ? "bg-emerald-500 border-emerald-500 text-white" : "border-gray-300"}`}
+                        className={`flex items-center justify-center w-3.5 h-3.5 rounded-full border transition-all ${
+                          rule.test(password)
+                            ? "bg-emerald-500 border-emerald-500 text-white"
+                            : "border-gray-300"
+                        }`}
                       >
                         {rule.test(password) && <CheckIcon size={8} />}
                       </span>
@@ -240,7 +218,6 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
               )}
             </div>
 
-            {/* Confirm password */}
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-gray-600">
                 Confirm password
@@ -275,7 +252,6 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
               )}
             </div>
 
-            {/* Submit */}
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -290,21 +266,9 @@ export default function SignUp({ onNavigateSignIn, onSignUpSuccess }) {
                 "Create account"
               )}
             </button>
-
-            <p className="text-center text-xs text-gray-400">
-              By signing up you agree to our{" "}
-              <span className="text-gray-600 hover:underline cursor-pointer">
-                Terms
-              </span>{" "}
-              and{" "}
-              <span className="text-gray-600 hover:underline cursor-pointer">
-                Privacy Policy
-              </span>
-            </p>
           </div>
         </div>
 
-        {/* Footer */}
         <p className="text-center text-xs text-gray-400 mt-5">
           Already have an account?{" "}
           <button

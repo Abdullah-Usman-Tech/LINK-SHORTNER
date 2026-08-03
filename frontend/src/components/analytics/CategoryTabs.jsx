@@ -11,6 +11,7 @@ export default function CategoryTabs({
     { name: "All Links", slug: "all", icon: "🔗", type: "all" },
     { name: "Job Applications", slug: "jobs", icon: "💼", type: "jobs" },
     { name: "My Projects", slug: "projects", icon: "🚀", type: "projects" },
+    { name: "Automate Apply", slug: "automate-apply", icon: "🤖", type: "automate-apply" },
     { name: "Test Lab", slug: "test-lab", icon: "🧪", type: "test-lab" },
   ];
 

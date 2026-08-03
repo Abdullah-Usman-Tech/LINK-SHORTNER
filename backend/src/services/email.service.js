@@ -57,19 +57,56 @@ export const verifyConnection = async (overrides = {}) => {
   }
 };
 
-export const sendMail = async ({ to, subject, text, html, smtpOverrides = {} }) => {
+const normalizeAttachments = (attachments = []) => {
+  if (!Array.isArray(attachments) || attachments.length === 0) return undefined;
+
+  return attachments
+    .map((item) => {
+      if (!item) return null;
+
+      const filename = item.filename || item.name || "attachment";
+      const contentType = item.contentType || item.content_type || undefined;
+      const encoding = item.encoding || undefined;
+      let content = item.content ?? item.data ?? item.buffer;
+
+      if (typeof content === "string" && encoding === "base64") {
+        content = Buffer.from(content.replace(/^data:[^;]+;base64,/, ""), "base64");
+      }
+
+      if (content == null || content === "") return null;
+
+      return {
+        filename,
+        content,
+        contentType,
+        cid: item.cid,
+      };
+    })
+    .filter(Boolean);
+};
+
+export const sendMail = async ({
+  to,
+  subject,
+  text,
+  html,
+  attachments = [],
+  smtpOverrides = {},
+}) => {
   try {
     const config = getSmtpConfig(smtpOverrides);
     const transporter = createTransporter(smtpOverrides);
     const fromAddress = `Abdullah Usman <${config.user}>`;
+    const normalizedAttachments = normalizeAttachments(attachments);
 
     const mailOptions = {
       from: fromAddress,
       to,
-      cc:fromAddress,
+      cc: fromAddress,
       subject: subject || "Test Email from Automation Sandbox",
       text: text || undefined,
       html: html || text || "<p>This is a test email sent from your automation dashboard.</p>",
+      ...(normalizedAttachments?.length ? { attachments: normalizedAttachments } : {}),
     };
 
     const info = await transporter.sendMail(mailOptions);
@@ -79,6 +116,7 @@ export const sendMail = async ({ to, subject, text, html, smtpOverrides = {} }) 
       response: info.response,
       accepted: info.accepted,
       rejected: info.rejected,
+      attachmentCount: normalizedAttachments?.length || 0,
     };
   } catch (error) {
     console.error("Error sending email:", error);

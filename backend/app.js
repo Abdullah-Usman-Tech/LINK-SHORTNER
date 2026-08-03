@@ -9,14 +9,23 @@ import authRoutes from "./src/routes/auth.route.js";
 import longUrlRoutes from "./src/routes/longUrl.route.js";
 import trackedItemRoutes from "./src/routes/trackedItem.route.js";
 import testRoutes from "./src/routes/test.route.js";
-import { redirectFromShortUrl } from "./src/controllers/shortUrl.controller.js";
+import {
+  openEmailPixel,
+  redirectFromShortUrl,
+} from "./src/controllers/shortUrl.controller.js";
+import { ensureOwnerAccountAndMigrateData } from "./src/services/authBootstrap.service.js";
+import {
+  getPublicHost,
+  isLocalTrackingHost,
+} from "./src/services/shortUrl.service.js";
+import Category from "./src/models/category.model.js";
 
 dotenv.config();
 
 const app = express();
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: "15mb" }));
+app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 
 const allowedOrigins = [
   "https://link-shortner-frontend.abdullah-usman.tech",
@@ -42,6 +51,8 @@ app.use(
 );
 app.use(cookieParser());
 
+// Email open pixel (must be public HTTPS — Gmail proxies this URL from their servers)
+app.get("/o/:shortUrl", openEmailPixel);
 app.get("/:shortUrl", redirectFromShortUrl);
 app.use("/api/auth", authRoutes);
 app.use("/api/shortUrl", shortUrlRoutes);
@@ -55,8 +66,32 @@ app.get("/", (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 
-connectDB().then(
-  app.listen(PORT, () => {
-    console.log(`Server is running on port ${PORT}`);
-  }),
-);
+const dropLegacyCategorySlugIndex = async () => {
+  try {
+    await Category.collection.dropIndex("slug_1");
+    console.log("[auth-bootstrap] Dropped legacy Category.slug unique index");
+  } catch (err) {
+    if (err?.codeName !== "IndexNotFound" && err?.code !== 27) {
+      console.warn("[auth-bootstrap] Could not drop slug_1 index:", err.message);
+    }
+  }
+};
+
+connectDB()
+  .then(async () => {
+    await dropLegacyCategorySlugIndex();
+    await ensureOwnerAccountAndMigrateData();
+    app.listen(PORT, () => {
+      console.log(`Server is running on port ${PORT}`);
+      console.log(`[tracking] Public host for short links / pixels: ${getPublicHost()}`);
+      if (isLocalTrackingHost()) {
+        console.warn(
+          "[tracking] PUBLIC_HOST/HOST is localhost — Gmail cannot load email open pixels. Set PUBLIC_HOST to a public HTTPS URL (deployed API or a tunnel like cloudflared/ngrok).",
+        );
+      }
+    });
+  })
+  .catch((err) => {
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  });

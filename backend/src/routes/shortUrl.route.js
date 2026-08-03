@@ -4,15 +4,16 @@ import {
   createCustomUrl,
   createShortUrl,
   deleteUrl,
-  redirectFromShortUrl,
 } from "../controllers/shortUrl.controller.js";
 import { authMiddleware } from "../middleware/auth.middleware.js";
+
 const router = express.Router();
-router.delete("/:shortUrl", deleteUrl);
+
+router.use(authMiddleware);
+
 router.get("/", allUrls);
 router.post("/", createShortUrl);
-// router.post("/custom", authMiddleware, createCustomUrl);
-
 router.post("/custom", createCustomUrl);
+router.delete("/:shortUrl", deleteUrl);
 
 export default router;

@@ -112,6 +112,9 @@ export default function JobTrackerCard({
     else if (link.type === "portfolio") portfolioViews += m.clicks;
   });
 
+  // Pixel opens OR any tracked link click from that email counts as engagement
+  const emailEngaged = emailViews > 0 || resumeViews > 0 || portfolioViews > 0;
+
   const handleDelete = () => {
     if (
       window.confirm(
@@ -185,7 +188,7 @@ export default function JobTrackerCard({
         <div className="flex items-center gap-2">
           <span
             className={`p-1.5 rounded-md ${
-              emailViews > 0 ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-400"
+              emailEngaged ? "bg-emerald-100 text-emerald-700" : "bg-gray-200 text-gray-400"
             }`}
           >
             <MailIcon />
@@ -194,10 +197,14 @@ export default function JobTrackerCard({
             <span className="text-[11px] font-semibold text-gray-700 block">Email Opened</span>
             <span
               className={`text-xs font-bold ${
-                emailViews > 0 ? "text-emerald-600" : "text-gray-400"
+                emailEngaged ? "text-emerald-600" : "text-gray-400"
               }`}
             >
-              {emailViews > 0 ? `Yes (${emailViews} opens)` : "Not opened yet"}
+              {emailEngaged
+                ? emailViews > 0
+                  ? `Yes (${emailViews} opens)`
+                  : `Yes (link clicked)`
+                : "Not opened yet"}
             </span>
           </div>
         </div>

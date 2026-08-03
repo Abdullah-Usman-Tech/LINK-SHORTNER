@@ -182,20 +182,16 @@ const callGemini = async ({ apiKey, baseUrl, model, systemPrompt, userPrompt }) 
   }
 
   return {
-    tailoredHtml: content,
+    content,
     model,
     usage: data?.usageMetadata || null,
   };
 };
 
-export const tailorResumeWithLlm = async ({
-  jobDescription,
-  resumeHtml,
-  guidelines = "",
-}) => {
-  const { apiKey, model, baseUrl, provider } = getLlmConfig();
+const requireGeminiConfig = () => {
+  const config = getLlmConfig();
 
-  if (!apiKey) {
+  if (!config.apiKey) {
     const err = new Error(
       "Gemini API key is missing. Set GEMINI_API_KEY in backend/.env",
     );
@@ -204,6 +200,260 @@ export const tailorResumeWithLlm = async ({
     err.hint = "Get a free key at https://aistudio.google.com/apikey";
     throw err;
   }
+
+  if (config.provider !== "gemini") {
+    const err = new Error(
+      `Unsupported LLM_PROVIDER "${config.provider}". Set LLM_PROVIDER=gemini in backend/.env`,
+    );
+    err.code = "UNSUPPORTED_PROVIDER";
+    err.status = 400;
+    throw err;
+  }
+
+  return config;
+};
+
+const parseJsonFromLlm = (content) => {
+  let text = String(content || "").trim();
+  if (text.startsWith("```")) {
+    text = text.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "");
+  }
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  if (start === -1 || end === -1 || end <= start) {
+    throw new Error("LLM did not return valid JSON");
+  }
+  return JSON.parse(text.slice(start, end + 1));
+};
+
+const extractEmailsFromText = (text) => {
+  const matches = String(text || "").match(
+    /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g,
+  );
+  if (!matches?.length) return [];
+  const skip = /noreply|no-reply|donotreply|example\.com|sentry|linkedin\.com/i;
+  return [...new Set(matches.filter((e) => !skip.test(e)))];
+};
+
+export const fetchPostContentFromUrl = async (url) => {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    const err = new Error("Invalid post URL");
+    err.code = "VALIDATION";
+    err.status = 400;
+    throw err;
+  }
+
+  if (!/^https?:$/i.test(parsed.protocol)) {
+    const err = new Error("Only http/https URLs are supported");
+    err.code = "VALIDATION";
+    err.status = 400;
+    throw err;
+  }
+
+  let response;
+  try {
+    response = await fetch(parsed.toString(), {
+      method: "GET",
+      redirect: "follow",
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+        Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+    });
+  } catch (networkErr) {
+    const err = new Error(
+      `Could not fetch the post URL (${networkErr.message}). Paste the full post text instead.`,
+    );
+    err.code = "FETCH_FAILED";
+    err.status = 400;
+    throw err;
+  }
+
+  const html = await response.text();
+  if (!response.ok) {
+    const err = new Error(
+      `Could not load post URL (HTTP ${response.status}). LinkedIn often blocks automated fetches — paste the full post text instead.`,
+    );
+    err.code = "FETCH_FAILED";
+    err.status = 400;
+    throw err;
+  }
+
+  const text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (text.length < 80) {
+    const err = new Error(
+      "Fetched page had almost no readable text (login wall / blocked). Paste the full LinkedIn post text instead.",
+    );
+    err.code = "FETCH_EMPTY";
+    err.status = 400;
+    throw err;
+  }
+
+  return text.slice(0, 25000);
+};
+
+export const parseJobPostWithLlm = async ({ postText }) => {
+  const { apiKey, model, baseUrl } = requireGeminiConfig();
+
+  if (!postText?.trim()) {
+    const err = new Error("Post text is required");
+    err.code = "VALIDATION";
+    err.status = 400;
+    throw err;
+  }
+
+  const systemPrompt = `You extract job-application details from LinkedIn / hiring posts.
+Return ONLY valid JSON (no markdown) with this exact shape:
+{
+  "jobTitle": "string or empty",
+  "company": "string or empty",
+  "hiringManager": "string or empty",
+  "email": "application email if present else empty",
+  "jobDescription": "cleaned full JD / role requirements from the post",
+  "notes": "short note if email missing or unclear"
+}
+Rules:
+- Prefer the email where candidates should apply / send CV.
+- jobDescription must keep requirements, responsibilities, and location/experience if present.
+- Do not invent an email. If none, use "".`;
+
+  const userPrompt = `POST CONTENT:
+${postText.trim().slice(0, 20000)}
+
+Extract the JSON now.`;
+
+  const result = await callGemini({
+    apiKey,
+    baseUrl,
+    model,
+    systemPrompt,
+    userPrompt,
+  });
+
+  let extracted;
+  try {
+    extracted = parseJsonFromLlm(result.content);
+  } catch {
+    const err = new Error("Failed to parse job post into structured fields");
+    err.code = "PARSE_FAILED";
+    err.status = 502;
+    throw err;
+  }
+
+  const regexEmails = extractEmailsFromText(postText);
+  const email =
+    String(extracted.email || "").trim() || regexEmails[0] || "";
+
+  return {
+    extracted: {
+      jobTitle: String(extracted.jobTitle || "").trim(),
+      company: String(extracted.company || "").trim(),
+      hiringManager: String(extracted.hiringManager || "").trim(),
+      email,
+      jobDescription: String(extracted.jobDescription || postText).trim(),
+      notes: String(extracted.notes || "").trim(),
+    },
+    model: result.model,
+    usage: result.usage,
+  };
+};
+
+export const generateApplyEmailWithLlm = async ({
+  jobDescription,
+  resumeHtml,
+  company = "",
+  jobTitle = "",
+  hiringManager = "",
+  applicantName = "Abdullah Usman",
+}) => {
+  const { apiKey, model, baseUrl } = requireGeminiConfig();
+
+  const systemPrompt = `You write concise, professional job-application emails.
+Return ONLY valid JSON (no markdown):
+{
+  "subject": "email subject",
+  "bodyHtml": "HTML email body with short paragraphs and a polite close",
+  "bodyText": "plain-text version of the same email"
+}
+Rules:
+- 120–220 words.
+- Mention role + company if known.
+- Highlight 2–4 truthful strengths aligned to the JD (from resume only — do not invent experience).
+- Ask for next steps / interview politely.
+- Mention that the tailored resume PDF is attached (it will be attached by the sending system).
+- Do NOT invent URLs. Tracking links for portfolio/GitHub/etc. are appended automatically after you write the email.
+- Sign off as ${applicantName}.`;
+
+  const userPrompt = `ROLE: ${jobTitle || "Not specified"}
+COMPANY: ${company || "Not specified"}
+HIRING CONTACT: ${hiringManager || "Hiring Team"}
+
+JOB DESCRIPTION:
+${String(jobDescription || "").trim().slice(0, 12000)}
+
+CANDIDATE RESUME (HTML / text):
+${String(resumeHtml || "").trim().slice(0, 18000)}
+
+Write the application email JSON now.`;
+
+  const result = await callGemini({
+    apiKey,
+    baseUrl,
+    model,
+    systemPrompt,
+    userPrompt,
+  });
+
+  let draft;
+  try {
+    draft = parseJsonFromLlm(result.content);
+  } catch {
+    const err = new Error("Failed to generate application email");
+    err.code = "EMAIL_GEN_FAILED";
+    err.status = 502;
+    throw err;
+  }
+
+  const subject =
+    String(draft.subject || "").trim() ||
+    `Application for ${jobTitle || "the role"}${company ? ` at ${company}` : ""}`;
+
+  const bodyHtml =
+    String(draft.bodyHtml || "").trim() ||
+    `<p>${String(draft.bodyText || "").trim()}</p>`;
+
+  const bodyText = String(draft.bodyText || "").trim();
+
+  return {
+    subject,
+    bodyHtml,
+    bodyText,
+    model: result.model,
+    usage: result.usage,
+  };
+};
+
+export const tailorResumeWithLlm = async ({
+  jobDescription,
+  resumeHtml,
+  guidelines = "",
+}) => {
+  const { apiKey, model, baseUrl } = requireGeminiConfig();
 
   if (!jobDescription?.trim()) {
     const err = new Error("Job description is required");
@@ -240,14 +490,10 @@ ${resumeHtml.trim()}
 
 Return the tailored resume as HTML body content only.`;
 
-  if (provider !== "gemini") {
-    const err = new Error(
-      `Unsupported LLM_PROVIDER "${provider}". Set LLM_PROVIDER=gemini in backend/.env`,
-    );
-    err.code = "UNSUPPORTED_PROVIDER";
-    err.status = 400;
-    throw err;
-  }
-
-  return callGemini({ apiKey, baseUrl, model, systemPrompt, userPrompt });
+  const result = await callGemini({ apiKey, baseUrl, model, systemPrompt, userPrompt });
+  return {
+    tailoredHtml: result.content,
+    model: result.model,
+    usage: result.usage,
+  };
 };

@@ -1,40 +1,159 @@
-import bcrypt from "bcrypt";
 import { cookiesOptions } from "../config/config.js";
-import { createUser, findUserByEmail } from "../dao/user.dao.js";
-import User from "../models/user.model.js";
+import {
+  createUser,
+  findUserByEmail,
+  findUserById,
+  sanitizeUser,
+  updateUserProfile,
+} from "../dao/user.dao.js";
 import { comparePassword, hashPassword } from "../utils/hashPassword.js";
 import { createJWT } from "../utils/JWT.js";
 
+const isValidEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(email || "").trim());
+
 export const signIn = async (req, res) => {
-  const { email, password } = req.body;
-  const user = await findUserByEmail(email);
-  if (!user || !password) {
-    return res
-      .status(401)
-      .json({ message: "Invalid credentials - User Not Found" });
+  try {
+    const { email, password } = req.body || {};
+
+    if (!email?.trim() || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+
+    const user = await findUserByEmail(email, { includePassword: true });
+    if (!user) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const passwordMatches = await comparePassword(password, user.password);
+    if (!passwordMatches) {
+      return res.status(401).json({ message: "Invalid email or password" });
+    }
+
+    const token = createJWT({ userId: user._id });
+    res.cookie("token", token, cookiesOptions);
+
+    return res.status(200).json({
+      message: "Login successful",
+      user: sanitizeUser(user),
+      token,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Failed to sign in",
+    });
   }
-  const passwordMatches = await comparePassword(password, user.password);
-  if (!passwordMatches) {
-    return res
-      .status(401)
-      .json({ message: "Invalid credentials - Password Incorrect" });
-  }
-  const token = createJWT({ userId: user._id });
-  res.cookie("token", token, cookiesOptions);
-  res.status(200).json({ user, message: "Login Successfull", token });
 };
 
 export const signUp = async (req, res) => {
-  const { email, password } = req.body;
-  const user = await findUserByEmail(email);
-  if (user) {
-    return res
-      .status(401)
-      .json({ message: "Invalid credentials - User already exists" });
+  try {
+    const { email, password } = req.body || {};
+
+    if (!email?.trim() || !password) {
+      return res.status(400).json({ message: "Email and password are required" });
+    }
+    if (!isValidEmail(email)) {
+      return res.status(400).json({ message: "Enter a valid email address" });
+    }
+    if (String(password).length < 8) {
+      return res.status(400).json({ message: "Password must be at least 8 characters" });
+    }
+
+    const existing = await findUserByEmail(email);
+    if (existing) {
+      return res.status(409).json({ message: "An account with this email already exists" });
+    }
+
+    const hashedPassword = await hashPassword(password);
+    const newUser = await createUser(email, hashedPassword);
+    const token = createJWT({ userId: newUser._id });
+    res.cookie("token", token, cookiesOptions);
+
+    return res.status(201).json({
+      message: "Account created successfully",
+      user: sanitizeUser(newUser),
+      token,
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Failed to sign up",
+    });
   }
-  const hashedPassword = await hashPassword(password);
-  const newUser = await createUser(email, hashedPassword);
-  const token = createJWT({ userid: newUser._id });
-  res.cookie("token", token, cookiesOptions);
-  res.json({ message: "User Created Successfully", user: newUser, token });
+};
+
+export const getMe = async (req, res) => {
+  try {
+    const user = await findUserById(req.user._id);
+    if (!user) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+    return res.status(200).json({ user: sanitizeUser(user) });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Failed to fetch profile",
+    });
+  }
+};
+
+export const updateMe = async (req, res) => {
+  try {
+    const {
+      name = "",
+      bio = "",
+      phone = "",
+      location = "",
+      website = "",
+      github = "",
+      linkedin = "",
+      twitter = "",
+      portfolio = "",
+      youtube = "",
+      customLinks = [],
+    } = req.body || {};
+
+    const normalizedCustomLinks = Array.isArray(customLinks)
+      ? customLinks
+          .map((item) => ({
+            label: String(item?.label || "").trim(),
+            url: String(item?.url || "").trim(),
+          }))
+          .filter((item) => item.label && item.url)
+      : [];
+
+    const cleaned = {
+      name: String(name || "").trim(),
+      bio: String(bio || "").trim(),
+      phone: String(phone || "").trim(),
+      location: String(location || "").trim(),
+      website: String(website || "").trim(),
+      github: String(github || "").trim(),
+      linkedin: String(linkedin || "").trim(),
+      twitter: String(twitter || "").trim(),
+      portfolio: String(portfolio || "").trim(),
+      youtube: String(youtube || "").trim(),
+      customLinks: normalizedCustomLinks,
+    };
+
+    const updated = await updateUserProfile(req.user._id, cleaned);
+    if (!updated) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: sanitizeUser(updated),
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Failed to update profile",
+    });
+  }
+};
+
+export const signOut = async (req, res) => {
+  res.clearCookie("token", {
+    httpOnly: cookiesOptions.httpOnly,
+    secure: cookiesOptions.secure,
+    sameSite: cookiesOptions.sameSite,
+  });
+  return res.status(200).json({ message: "Signed out successfully" });
 };

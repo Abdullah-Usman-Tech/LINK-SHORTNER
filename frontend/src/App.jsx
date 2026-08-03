@@ -7,15 +7,21 @@ import Modal from "./components/Modal.jsx";
 import SkeletonLoader from "./components/SkeletonLoader.jsx";
 import CreateLongUrlForm from "./components/shared/CreateLongUrlForm.jsx";
 import { getAllUrls } from "./api/shortUrl.api.js";
+import { getMe, signOut } from "./api/auth.api.js";
 
 function App() {
+  const [authView, setAuthView] = useState("signin"); // signin | signup
+  const [user, setUser] = useState(null);
+  const [authChecking, setAuthChecking] = useState(true);
+
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isCreateLongModalOpen, setIsCreateLongModalOpen] = useState(false);
 
   const [data, setData] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   const fetchUrls = () => {
+    setLoading(true);
     getAllUrls()
       .then((res) => {
         setData(res.urls || []);
@@ -29,18 +35,65 @@ function App() {
     fetchUrls();
   };
 
-  useEffect(() => {
+  const handleAuthSuccess = (res) => {
+    setUser(res.user);
+    setAuthView("signin");
     fetchUrls();
+  };
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUser(null);
+      setData([]);
+      setAuthView("signin");
+    }
+  };
+
+  useEffect(() => {
+    getMe()
+      .then((res) => {
+        setUser(res.user);
+        fetchUrls();
+      })
+      .catch(() => {
+        setUser(null);
+      })
+      .finally(() => setAuthChecking(false));
   }, []);
 
-  if (loading) return <SkeletonLoader />;
+  if (authChecking) return <SkeletonLoader />;
+
+  if (!user) {
+    return authView === "signup" ? (
+      <SignUp
+        onNavigateSignIn={() => setAuthView("signin")}
+        onSignUpSuccess={handleAuthSuccess}
+      />
+    ) : (
+      <SignIn
+        onNavigateSignUp={() => setAuthView("signup")}
+        onSignInSuccess={handleAuthSuccess}
+      />
+    );
+  }
+
+  if (loading && data.length === 0) return <SkeletonLoader />;
 
   return (
     <>
       <Analytics
         links={data}
+        isLoading={loading}
         onCreateNew={() => setIsCreateModalOpen(true)}
         onCreateLongLink={() => setIsCreateLongModalOpen(true)}
+        onLogout={handleLogout}
+        onUserUpdate={setUser}
+        onLinksRefresh={fetchUrls}
+        user={user}
       />
 
       <Modal

@@ -1,6 +1,5 @@
 import mongoose from "mongoose";
 import ShortUrl from "../models/shortUrl.model.js";
-import { generteNanoId } from "../utils/generteNanoId.js";
 
 export const saveShortUrl = async ({
   fullUrl,
@@ -8,13 +7,14 @@ export const saveShortUrl = async ({
   userId,
   custom = false,
 }) => {
-  return await ShortUrl.create({
+  return ShortUrl.create({
     fullUrl,
     shortUrl,
     userId,
     custom,
   });
 };
+
 export const getFullUrl = async (shortUrl, viewLog = {}) => {
   const updateQuery = {
     $inc: { clicks: 1 },
@@ -45,21 +45,23 @@ export const getFullUrl = async (shortUrl, viewLog = {}) => {
 
   return urlData ? urlData.fullUrl : null;
 };
+
 export const findUrl = async (shortUrl) => {
   const urlData = await ShortUrl.findOne({ shortUrl });
-
   return urlData ? urlData.fullUrl : null;
 };
-export const getAllUrls = async () => {
-  return await ShortUrl.find();
+
+export const getAllUrls = async (userId) => {
+  return ShortUrl.find({ userId }).sort({ createdAt: -1 });
 };
-export const deleteURLFromDB = async (identifier) => {
+
+export const deleteURLFromDB = async (identifier, userId) => {
   const isObjectId = mongoose.Types.ObjectId.isValid(identifier);
-  return await ShortUrl.findOneAndDelete({
+  return ShortUrl.findOneAndDelete({
+    userId,
     $or: [
       { shortUrl: identifier },
       ...(isObjectId ? [{ _id: identifier }] : []),
     ],
   });
 };
-

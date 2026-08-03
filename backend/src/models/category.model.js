@@ -10,7 +10,6 @@ const categorySchema = new mongoose.Schema(
     slug: {
       type: String,
       required: true,
-      unique: true,
       lowercase: true,
       trim: true,
     },
@@ -24,14 +23,22 @@ const categorySchema = new mongoose.Schema(
     },
     type: {
       type: String,
-      enum: ["all", "jobs", "projects", "custom"],
+      enum: ["all", "jobs", "projects", "custom", "test-lab", "automate-apply"],
       default: "custom",
+    },
+    userId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+      index: true,
     },
   },
   {
     timestamps: true,
   },
 );
+
+categorySchema.index({ userId: 1, slug: 1 }, { unique: true });
 
 const Category = mongoose.model("Category", categorySchema);
 export default Category;
