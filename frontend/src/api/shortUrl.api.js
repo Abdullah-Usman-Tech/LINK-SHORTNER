@@ -106,6 +106,7 @@ export const automateEmailApply = async ({
   autoSendEmail = false,
   smtpOverrides = {},
   applicantName = "Abdullah Usman",
+  profileLinks = {},
 }) => {
   const res = await api.post(
     "/test/automate-email-apply",
@@ -117,6 +118,7 @@ export const automateEmailApply = async ({
       autoSendEmail,
       smtpOverrides,
       applicantName,
+      profileLinks,
     },
     { timeout: 180000 },
   );

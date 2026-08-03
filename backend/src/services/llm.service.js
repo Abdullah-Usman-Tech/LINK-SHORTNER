@@ -396,6 +396,7 @@ Rules:
 - Highlight 2–4 truthful strengths aligned to the JD (from resume only — do not invent experience).
 - Ask for next steps / interview politely.
 - Mention that the tailored resume PDF is attached (it will be attached by the sending system).
+- Do NOT invent URLs. Tracking links for portfolio/GitHub/etc. are appended automatically after you write the email.
 - Sign off as ${applicantName}.`;
 
   const userPrompt = `ROLE: ${jobTitle || "Not specified"}

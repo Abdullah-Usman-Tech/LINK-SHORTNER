@@ -62,7 +62,7 @@ const STEPS = [
   "Send (if on)",
 ];
 
-export default function AutomateEmailApplyPanel({ onJobTracked }) {
+export default function AutomateEmailApplyPanel({ onJobTracked, user }) {
   const styles = extractStyles(defaultResumeHtml);
   const [inputMode, setInputMode] = useState("paste"); // paste | url
   const [postText, setPostText] = useState("");
@@ -93,7 +93,7 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
     );
   }, [resultHtml, editing, styles]);
 
-  const buildTrackedItemPayload = (extracted, recipientEmail) => {
+  const buildTrackedItemPayload = (extracted, recipientEmail, trackedLinks = []) => {
     const company = extracted?.company?.trim() || "";
     const jobTitle = extracted?.jobTitle?.trim() || "";
     const title = jobTitle || (company ? `Application at ${company}` : "Job Application");
@@ -113,7 +113,7 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
         .join("\n"),
       sourceUrl: inputMode === "url" ? postUrl.trim() : "",
       status: "Email Sent",
-      trackedLinks: [],
+      trackedLinks: trackedLinks || [],
     };
   };
 
@@ -166,6 +166,23 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
       return;
     }
 
+    const hasProfileLinks = Boolean(
+      user?.portfolio ||
+        user?.website ||
+        user?.github ||
+        user?.linkedin ||
+        user?.twitter ||
+        user?.youtube ||
+        (Array.isArray(user?.customLinks) && user.customLinks.some((l) => l?.url)),
+    );
+    if (!hasProfileLinks) {
+      setMessage({
+        type: "error",
+        text: "Add at least one link in Account (Portfolio / GitHub / LinkedIn), click Save changes, then run auto-apply again. Short tracking URLs are created from those links.",
+      });
+      return;
+    }
+
     setRunning(true);
     setMessage(null);
     setResult(null);
@@ -185,7 +202,17 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
         resumeHtml,
         guidelines: guidelines.trim(),
         autoSendEmail,
-        applicantName: "Abdullah Usman",
+        applicantName: user?.name || "Abdullah Usman",
+        profileLinks: {
+          name: user?.name || "",
+          website: user?.website || "",
+          portfolio: user?.portfolio || "",
+          github: user?.github || "",
+          linkedin: user?.linkedin || "",
+          twitter: user?.twitter || "",
+          youtube: user?.youtube || "",
+          customLinks: Array.isArray(user?.customLinks) ? user.customLinks : [],
+        },
       });
 
       const tailored = res.tailoredHtml || "";
@@ -200,13 +227,19 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
       setResult(res);
       setActiveStep(3);
 
-      if (res.trackingCreated) {
+      if (res.trackingCreated || (res.trackedLinks && res.trackedLinks.length > 0)) {
         notifyJobTracked();
       }
 
       setMessage({
-        type: "success",
-        text: res.message || "Automate email apply finished.",
+        type: res.profileHint || res.openTrackingWarning ? "error" : "success",
+        text: [
+          res.message || "Automate email apply finished.",
+          res.profileHint,
+          res.openTrackingWarning,
+        ]
+          .filter(Boolean)
+          .join(" "),
       });
     } catch (err) {
       const formatted = formatError(err);
@@ -333,7 +366,13 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
         text: res.message || `Email sent to ${emailTo.trim()} with resume PDF attached`,
       });
       if (result?.extracted) {
-        await createTrackedItem(buildTrackedItemPayload(result.extracted, emailTo.trim()));
+        await createTrackedItem(
+          buildTrackedItemPayload(
+            result.extracted,
+            emailTo.trim(),
+            result.trackedLinks || [],
+          ),
+        );
         notifyJobTracked();
       }
       setResult((prev) =>
@@ -365,7 +404,8 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
           </h3>
           <p className="text-xs text-gray-500 mt-0.5">
             Paste a hiring post (or try a URL). We extract JD + apply email, tailor your resume,
-            draft the application mail with resume PDF attached — and send it only when auto-send is on.
+            create tracking short links from your Account profile, draft the mail with those links,
+            attach the resume PDF — and send only when auto-send is on.
           </p>
         </div>
 
@@ -439,8 +479,8 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
               <p className="text-xs font-semibold text-gray-900">Auto-send email</p>
               <p className="text-[11px] text-gray-500 mt-0.5">
                 {autoSendEmail
-                  ? "On — after drafting, the email is sent with your tailored resume PDF attached."
-                  : "Off — still parse + tailor resume + draft email, but do not send."}
+                  ? "On — email is sent with resume PDF + Account tracking links, and a job entry is created."
+                  : "Off — still parse + tailor + draft with tracking links, but do not send."}
               </p>
             </div>
             <button
@@ -551,6 +591,40 @@ export default function AutomateEmailApplyPanel({ onJobTracked }) {
               <p className="mt-3 text-[11px] text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
                 {result.extracted.notes}
               </p>
+            )}
+            {Array.isArray(result.trackedLinks) && (
+              <div className="mt-4">
+                <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold mb-1.5">
+                  Tracking links created
+                </p>
+                {result.trackedLinks.length === 0 ? (
+                  <p className="text-xs text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+                    No profile links found. Add Portfolio / GitHub / LinkedIn in Account, then run again.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {result.trackedLinks.map((link) => (
+                      <div
+                        key={`${link.type}-${link.shortUrl}`}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 rounded-xl border border-gray-100 bg-gray-50 px-3 py-2 text-xs"
+                      >
+                        <span className="font-semibold text-gray-800">
+                          {link.label}{" "}
+                          <span className="font-normal text-gray-400">({link.type})</span>
+                        </span>
+                        <a
+                          href={link.shortUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-gray-600 hover:text-gray-900 break-all"
+                        >
+                          {link.shortUrl}
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 

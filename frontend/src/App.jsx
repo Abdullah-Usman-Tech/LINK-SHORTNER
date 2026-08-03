@@ -83,8 +83,6 @@ function App() {
 
   if (loading && data.length === 0) return <SkeletonLoader />;
 
-  const displayName = user.email?.split("@")[0] || "User";
-
   return (
     <>
       <Analytics
@@ -93,7 +91,9 @@ function App() {
         onCreateNew={() => setIsCreateModalOpen(true)}
         onCreateLongLink={() => setIsCreateLongModalOpen(true)}
         onLogout={handleLogout}
-        user={{ name: displayName, email: user.email }}
+        onUserUpdate={setUser}
+        onLinksRefresh={fetchUrls}
+        user={user}
       />
 
       <Modal

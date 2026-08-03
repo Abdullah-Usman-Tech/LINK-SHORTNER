@@ -6,7 +6,17 @@ import {
   fetchPostContentFromUrl,
 } from "../services/llm.service.js";
 import { buildResumePdfAttachment } from "../services/resumePdf.service.js";
-import { createJobApplicationFromAutoApply } from "../services/jobTracker.service.js";
+import {
+  appendTrackedLinksToEmail,
+  buildTrackedLinksFromProfile,
+  createJobApplicationFromAutoApply,
+  mergeProfileSources,
+} from "../services/jobTracker.service.js";
+import { findUserById } from "../dao/user.dao.js";
+import {
+  getPublicHost,
+  isLocalTrackingHost,
+} from "../services/shortUrl.service.js";
 
 const llmErrorResponse = (err) => {
   const status =
@@ -140,6 +150,7 @@ export const automateEmailApply = async (req, res) => {
       autoSendEmail = false,
       smtpOverrides = {},
       applicantName = "Abdullah Usman",
+      profileLinks = {},
     } = req.body || {};
 
     if (!resumeHtml?.trim()) {
@@ -178,6 +189,11 @@ export const automateEmailApply = async (req, res) => {
       });
     }
 
+    const dbUser = await findUserById(req.user._id);
+    const profileUser = mergeProfileSources(dbUser, profileLinks);
+    const applicantDisplayName =
+      profileUser?.name?.trim() || applicantName || "Abdullah Usman";
+
     const tailored = await tailorResumeWithLlm({
       jobDescription: extracted.jobDescription,
       guidelines,
@@ -190,15 +206,31 @@ export const automateEmailApply = async (req, res) => {
       company: extracted.company,
       jobTitle: extracted.jobTitle,
       hiringManager: extracted.hiringManager,
-      applicantName,
+      applicantName: applicantDisplayName,
+    });
+
+    const trackedLinks = await buildTrackedLinksFromProfile(profileUser, req.user._id);
+    const withLinks = appendTrackedLinksToEmail({
+      bodyHtml: emailDraft.bodyHtml,
+      bodyText: emailDraft.bodyText,
+      trackedLinks,
     });
 
     const draft = {
       to: extracted.email || "",
       subject: emailDraft.subject,
-      bodyHtml: emailDraft.bodyHtml,
-      bodyText: emailDraft.bodyText,
+      bodyHtml: withLinks.bodyHtml,
+      bodyText: withLinks.bodyText,
     };
+
+    const profileHint =
+      trackedLinks.length === 0
+        ? "No tracking short links created — add Portfolio/GitHub/LinkedIn in Account and save, then retry."
+        : null;
+
+    const openTrackingWarning = isLocalTrackingHost()
+      ? `Email open pixel points at ${getPublicHost()} which Gmail cannot reach. Set PUBLIC_HOST in backend/.env to a public HTTPS URL (deployed API or cloudflared/ngrok tunnel), restart the server, then send a new email.`
+      : null;
 
     let emailSent = false;
     let emailResult = null;
@@ -212,9 +244,10 @@ export const automateEmailApply = async (req, res) => {
       emailSkippedReason =
         "No application email found in the post — draft is ready, but nothing was sent.";
     } else {
+      const safeName = applicantDisplayName.replace(/[^\w.-]+/g, "_") || "Resume";
       const resumeAttachment = await buildResumePdfAttachment(
         tailored.tailoredHtml || resumeHtml,
-        { filename: "Abdullah_Usman_Resume.pdf" },
+        { filename: `${safeName}_Resume.pdf` },
       );
 
       emailResult = await sendMail({
@@ -234,18 +267,27 @@ export const automateEmailApply = async (req, res) => {
         recipientEmail: draft.to,
         sourceMode: sourceMode || "automate-email-apply",
         userId: req.user._id,
+        trackedLinks,
       });
     }
 
     return res.status(200).json({
       success: true,
       message: emailSent
-        ? `Resume tailored and application email sent to ${draft.to} with resume PDF attached. Job added to tracker.`
-        : "Post parsed and resume tailored. Email drafted (not sent).",
+        ? `Application sent to ${draft.to} with resume PDF + ${trackedLinks.length} tracking short link(s). Job added to tracker.`
+        : trackedLinks.length
+          ? `Draft ready with ${trackedLinks.length} tracking short link(s). Email not sent.`
+          : "Post parsed and resume tailored. Email drafted (not sent).",
       sourceMode,
       extracted,
       tailoredHtml: tailored.tailoredHtml,
       emailDraft: draft,
+      trackedLinks,
+      linksCreatedCount: trackedLinks.length,
+      profileHint,
+      openTrackingWarning,
+      publicHost: getPublicHost(),
+      openTrackingReady: !isLocalTrackingHost(),
       autoSendEmail: Boolean(autoSendEmail),
       emailSent,
       resumeAttached,

@@ -25,7 +25,7 @@ const SUB_TABS = [
   },
 ];
 
-export default function AutomateApplyTab({ onJobTracked }) {
+export default function AutomateApplyTab({ onJobTracked, user }) {
   const [activeSubTab, setActiveSubTab] = useState("email-apply");
   const activeMeta = SUB_TABS.find((t) => t.id === activeSubTab) || SUB_TABS[0];
 
@@ -77,7 +77,7 @@ export default function AutomateApplyTab({ onJobTracked }) {
       </div>
 
       {activeSubTab === "email-apply" && (
-        <AutomateEmailApplyPanel onJobTracked={onJobTracked} />
+        <AutomateEmailApplyPanel onJobTracked={onJobTracked} user={user} />
       )}
 
       {activeSubTab !== "email-apply" && (

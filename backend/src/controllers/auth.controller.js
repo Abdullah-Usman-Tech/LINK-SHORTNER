@@ -4,6 +4,7 @@ import {
   findUserByEmail,
   findUserById,
   sanitizeUser,
+  updateUserProfile,
 } from "../dao/user.dao.js";
 import { comparePassword, hashPassword } from "../utils/hashPassword.js";
 import { createJWT } from "../utils/JWT.js";
@@ -89,6 +90,61 @@ export const getMe = async (req, res) => {
   } catch (err) {
     return res.status(500).json({
       message: err.message || "Failed to fetch profile",
+    });
+  }
+};
+
+export const updateMe = async (req, res) => {
+  try {
+    const {
+      name = "",
+      bio = "",
+      phone = "",
+      location = "",
+      website = "",
+      github = "",
+      linkedin = "",
+      twitter = "",
+      portfolio = "",
+      youtube = "",
+      customLinks = [],
+    } = req.body || {};
+
+    const normalizedCustomLinks = Array.isArray(customLinks)
+      ? customLinks
+          .map((item) => ({
+            label: String(item?.label || "").trim(),
+            url: String(item?.url || "").trim(),
+          }))
+          .filter((item) => item.label && item.url)
+      : [];
+
+    const cleaned = {
+      name: String(name || "").trim(),
+      bio: String(bio || "").trim(),
+      phone: String(phone || "").trim(),
+      location: String(location || "").trim(),
+      website: String(website || "").trim(),
+      github: String(github || "").trim(),
+      linkedin: String(linkedin || "").trim(),
+      twitter: String(twitter || "").trim(),
+      portfolio: String(portfolio || "").trim(),
+      youtube: String(youtube || "").trim(),
+      customLinks: normalizedCustomLinks,
+    };
+
+    const updated = await updateUserProfile(req.user._id, cleaned);
+    if (!updated) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    return res.status(200).json({
+      message: "Profile updated successfully",
+      user: sanitizeUser(updated),
+    });
+  } catch (err) {
+    return res.status(500).json({
+      message: err.message || "Failed to update profile",
     });
   }
 };

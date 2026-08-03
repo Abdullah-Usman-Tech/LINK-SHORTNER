@@ -9,8 +9,15 @@ import authRoutes from "./src/routes/auth.route.js";
 import longUrlRoutes from "./src/routes/longUrl.route.js";
 import trackedItemRoutes from "./src/routes/trackedItem.route.js";
 import testRoutes from "./src/routes/test.route.js";
-import { redirectFromShortUrl } from "./src/controllers/shortUrl.controller.js";
+import {
+  openEmailPixel,
+  redirectFromShortUrl,
+} from "./src/controllers/shortUrl.controller.js";
 import { ensureOwnerAccountAndMigrateData } from "./src/services/authBootstrap.service.js";
+import {
+  getPublicHost,
+  isLocalTrackingHost,
+} from "./src/services/shortUrl.service.js";
 import Category from "./src/models/category.model.js";
 
 dotenv.config();
@@ -44,6 +51,8 @@ app.use(
 );
 app.use(cookieParser());
 
+// Email open pixel (must be public HTTPS — Gmail proxies this URL from their servers)
+app.get("/o/:shortUrl", openEmailPixel);
 app.get("/:shortUrl", redirectFromShortUrl);
 app.use("/api/auth", authRoutes);
 app.use("/api/shortUrl", shortUrlRoutes);
@@ -74,6 +83,12 @@ connectDB()
     await ensureOwnerAccountAndMigrateData();
     app.listen(PORT, () => {
       console.log(`Server is running on port ${PORT}`);
+      console.log(`[tracking] Public host for short links / pixels: ${getPublicHost()}`);
+      if (isLocalTrackingHost()) {
+        console.warn(
+          "[tracking] PUBLIC_HOST/HOST is localhost — Gmail cannot load email open pixels. Set PUBLIC_HOST to a public HTTPS URL (deployed API or a tunnel like cloudflared/ngrok).",
+        );
+      }
     });
   })
   .catch((err) => {

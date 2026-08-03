@@ -26,4 +26,28 @@ export const createUser = async (email, password) => {
   });
 };
 
+export const updateUserProfile = async (userId, profileData = {}) => {
+  const allowed = [
+    "name",
+    "bio",
+    "phone",
+    "location",
+    "website",
+    "github",
+    "linkedin",
+    "twitter",
+    "portfolio",
+    "youtube",
+    "customLinks",
+  ];
+
+  const updates = {};
+  for (const key of allowed) {
+    if (profileData[key] === undefined) continue;
+    updates[key] = profileData[key];
+  }
+
+  return User.findByIdAndUpdate(userId, { $set: updates }, { new: true });
+};
+
 export { sanitizeUser };
