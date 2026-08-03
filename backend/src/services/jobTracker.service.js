@@ -214,8 +214,11 @@ export const appendTrackedLinksToEmail = ({ bodyHtml = "", bodyText = "", tracke
   const textItems = visibleLinks.map((l) => `- ${l.label}: ${l.shortUrl}`).join("\n");
 
   const pixelHtml = emailPixel
-    ? `<img src="${buildEmailOpenPixelUrl(emailPixel.shortUrl)}" width="1" height="1" alt="" border="0" style="display:block;width:1px;height:1px;border:0;outline:none;overflow:hidden;" />`
+    ? `<img src="${emailPixel.shortUrl}" width="1" height="1" alt="" border="0" style="display:block;width:1px;height:1px;border:0;outline:none;overflow:hidden;" />`
     : "";
+console.log("shortURL------>",emailPixel.shortUrl)
+
+console.log("pixelHtml------>",pixelHtml)
 
   const linksBlockHtml = visibleLinks.length
     ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;">
