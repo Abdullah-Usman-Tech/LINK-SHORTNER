@@ -77,6 +77,9 @@ export const sendTestEmail = async ({
   isHtml = true,
   attachments = [],
   smtpOverrides = {},
+  includeTracking = false,
+  persistRecord = true,
+  sendSource = "manual",
 }) => {
   const res = await api.post("/test/send-email", {
     to,
@@ -85,6 +88,9 @@ export const sendTestEmail = async ({
     isHtml,
     attachments,
     smtpOverrides,
+    includeTracking,
+    persistRecord,
+    sendSource,
   });
   return res.data;
 };

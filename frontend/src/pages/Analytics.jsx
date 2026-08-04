@@ -180,8 +180,11 @@ export default function Analytics({
         item.companyOrPlatform.toLowerCase().includes(searchLower)) ||
       (item.description && item.description.toLowerCase().includes(searchLower));
     const itemCat = (item.category || "").toLowerCase();
+    const isTestLab =
+      item.sendSource === "manual" || itemCat.includes("test");
     return (
       matchesSearch &&
+      !isTestLab &&
       (itemCat.includes("job") || itemCat === "jobs" || !itemCat.includes("project"))
     );
   });

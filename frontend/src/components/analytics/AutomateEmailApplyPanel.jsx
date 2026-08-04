@@ -113,6 +113,11 @@ export default function AutomateEmailApplyPanel({ onJobTracked, user }) {
         .join("\n"),
       sourceUrl: inputMode === "url" ? postUrl.trim() : "",
       status: "Email Sent",
+      sendSource: "automate",
+      trackingEnabled: Array.isArray(trackedLinks) && trackedLinks.length > 0,
+      recipientEmail: recipientEmail || "",
+      emailSubject: "",
+      sentAt: new Date().toISOString(),
       trackedLinks: trackedLinks || [],
     };
   };
@@ -352,6 +357,9 @@ export default function AutomateEmailApplyPanel({ onJobTracked, user }) {
         subject: emailSubject.trim(),
         body: emailBody,
         isHtml: true,
+        includeTracking: false,
+        persistRecord: false,
+        sendSource: "automate",
         attachments: [
           {
             filename: "Abdullah_Usman_Resume.pdf",

@@ -45,8 +45,20 @@ export const getTrackedItemsController = async (req, res) => {
 
 export const createTrackedItemController = async (req, res) => {
   try {
-    const { title, companyOrPlatform, category, description, sourceUrl, status, trackedLinks } =
-      req.body;
+    const {
+      title,
+      companyOrPlatform,
+      category,
+      description,
+      sourceUrl,
+      status,
+      trackedLinks,
+      sendSource,
+      trackingEnabled,
+      recipientEmail,
+      emailSubject,
+      sentAt,
+    } = req.body;
 
     if (!title || !title.trim()) {
       return res.status(400).json({ message: "Title is required" });
@@ -59,6 +71,12 @@ export const createTrackedItemController = async (req, res) => {
       description: description || "",
       sourceUrl: sourceUrl || "",
       status: status || "Applied",
+      sendSource:
+        sendSource === "automate" || sendSource === "manual" ? sendSource : "unknown",
+      trackingEnabled: Boolean(trackingEnabled),
+      recipientEmail: recipientEmail || "",
+      emailSubject: emailSubject || "",
+      sentAt: sentAt ? new Date(sentAt) : new Date(),
       trackedLinks: trackedLinks || [],
       userId: req.user._id,
     });

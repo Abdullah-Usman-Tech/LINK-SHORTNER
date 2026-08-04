@@ -47,7 +47,12 @@ export default function JobDetailsDrawer({ item, allLinks = [], onClose }) {
             <div className="flex items-center justify-between mb-2">
               <div>
                 <span className="text-[10px] font-bold uppercase tracking-wider text-violet-600 px-2 py-0.5 rounded-full bg-violet-50 border border-violet-200">
-                  {item.category || "Jobs"} Tracker
+                  {item.sendSource === "automate"
+                    ? "Automate"
+                    : item.sendSource === "manual"
+                      ? "Manual / Test"
+                      : item.category || "Jobs"}{" "}
+                  Tracker
                 </span>
                 <h2 className="text-lg font-bold text-gray-900 mt-1">{item.title}</h2>
                 {item.companyOrPlatform && (

@@ -30,19 +30,29 @@ app.use(express.urlencoded({ extended: true, limit: "15mb" }));
 const allowedOrigins = [
   "https://link-shortner-frontend.abdullah-usman.tech",
   "http://localhost:5173",
+  "http://127.0.0.1:5173",
   "http://localhost:3000",
+  "http://127.0.0.1:3000",
   process.env.FRONTEND_URL,
 ].filter(Boolean);
 
 app.use(
   cors({
     origin: function (origin, callback) {
+      // Non-browser clients (curl, Postman, server-to-server)
       if (!origin) return callback(null, true);
+
       const cleanOrigin = origin.replace(/\/$/, "");
-      if (allowedOrigins.some((o) => o && o.replace(/\/$/, "") === cleanOrigin)) {
-        return callback(null, true);
+      const allowed = allowedOrigins.some(
+        (o) => o && o.replace(/\/$/, "") === cleanOrigin,
+      );
+
+      if (allowed) {
+        // Reflect exact origin (required when credentials: true)
+        return callback(null, origin);
       }
-      return callback(null, true);
+
+      return callback(new Error(`CORS blocked for origin: ${origin}`));
     },
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],

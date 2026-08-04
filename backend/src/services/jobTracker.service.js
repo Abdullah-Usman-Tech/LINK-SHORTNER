@@ -216,9 +216,6 @@ export const appendTrackedLinksToEmail = ({ bodyHtml = "", bodyText = "", tracke
   const pixelHtml = emailPixel
     ? `<img src="${emailPixel.shortUrl}" width="1" height="1" alt="" border="0" style="display:block;width:1px;height:1px;border:0;outline:none;overflow:hidden;" />`
     : "";
-console.log("shortURL------>",emailPixel.shortUrl)
-
-console.log("pixelHtml------>",pixelHtml)
 
   const linksBlockHtml = visibleLinks.length
     ? `<div style="margin-top:16px;padding-top:12px;border-top:1px solid #e5e7eb;">
@@ -268,6 +265,64 @@ export const createJobApplicationFromAutoApply = async ({
     }),
     sourceUrl: String(postUrl || "").trim(),
     status: "Email Sent",
+    sendSource: "automate",
+    trackingEnabled: Array.isArray(trackedLinks) && trackedLinks.length > 0,
+    recipientEmail: applyEmail,
+    emailSubject: "",
+    sentAt: new Date(),
+    trackedLinks: trackedLinks || [],
+    userId,
+  });
+};
+
+/** Email open pixel only — used by Test Lab when tracking is toggled on. */
+export const buildEmailOpenTrackerOnly = async (userId) => {
+  if (!userId) return [];
+  const created = await createOneTrackedLink({
+    label: "Email Open Tracker",
+    type: "email",
+    fullUrl: "__EMAIL_OPEN_PIXEL__",
+    userId,
+  });
+  return created ? [created] : [];
+};
+
+export const createTestEmailTrackedRecord = async ({
+  to = "",
+  subject = "",
+  userId,
+  trackedLinks = [],
+  trackingEnabled = false,
+  sendSource = "manual",
+}) => {
+  if (!userId) {
+    throw new Error("userId is required to create a test email record");
+  }
+
+  const recipient = String(to || "").trim();
+  const emailSubject = String(subject || "Test Email").trim();
+  const source = sendSource === "automate" ? "automate" : "manual";
+
+  return saveTrackedItemToDB({
+    title: emailSubject || "Test Email",
+    companyOrPlatform: recipient,
+    category: source === "automate" ? "jobs" : "test-lab",
+    description: [
+      source === "automate"
+        ? "Sent via Automate Email Apply."
+        : "Sent via Test Lab (manual).",
+      recipient ? `Recipient: ${recipient}` : "",
+      trackingEnabled ? "Open tracking: enabled" : "Open tracking: disabled",
+    ]
+      .filter(Boolean)
+      .join("\n"),
+    sourceUrl: "",
+    status: "Email Sent",
+    sendSource: source,
+    trackingEnabled: Boolean(trackingEnabled),
+    recipientEmail: recipient,
+    emailSubject,
+    sentAt: new Date(),
     trackedLinks: trackedLinks || [],
     userId,
   });

@@ -1,5 +1,58 @@
-import { useState, useEffect } from "react";
-import { verifySmtp, sendTestEmail } from "../../api/shortUrl.api.js";
+import { useState, useEffect, useCallback } from "react";
+import {
+  verifySmtp,
+  sendTestEmail,
+  getTrackedItems,
+  getAllUrls,
+} from "../../api/shortUrl.api.js";
+
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return String(value);
+  }
+};
+
+const getEmailOpenMetrics = (item, allLinks = []) => {
+  const emailLinks = (item.trackedLinks || []).filter((l) => l.type === "email");
+  if (!emailLinks.length) {
+    return { opens: 0, firstSeenAt: null, lastSeenAt: null };
+  }
+
+  let opens = 0;
+  let firstSeenAt = null;
+  let lastSeenAt = null;
+
+  for (const link of emailLinks) {
+    if (!link.shortUrl) continue;
+    const targetSlug = link.shortUrl.split("/").filter(Boolean).pop() || link.shortUrl;
+    const matched = allLinks.find((l) => {
+      if (!l || !l.shortUrl) return false;
+      const lSlug = l.shortUrl.split("/").filter(Boolean).pop() || l.shortUrl;
+      return (
+        l.shortUrl === link.shortUrl ||
+        l.shortUrl === targetSlug ||
+        lSlug === targetSlug ||
+        link.shortUrl.endsWith(`/${l.shortUrl}`)
+      );
+    });
+    if (!matched) continue;
+    opens += matched.clicks || 0;
+    const history = matched.viewsHistory || [];
+    for (const entry of history) {
+      const ts = entry?.timestamp || entry?.viewedAt || entry?.createdAt || entry;
+      if (!ts) continue;
+      const d = new Date(ts);
+      if (Number.isNaN(d.getTime())) continue;
+      if (!firstSeenAt || d < firstSeenAt) firstSeenAt = d;
+      if (!lastSeenAt || d > lastSeenAt) lastSeenAt = d;
+    }
+  }
+
+  return { opens, firstSeenAt, lastSeenAt };
+};
 
 export default function EmailTestPanel() {
   const [smtpConfig, setSmtpConfig] = useState({
@@ -25,9 +78,31 @@ export default function EmailTestPanel() {
 </div>`,
   );
   const [isHtml, setIsHtml] = useState(true);
+  const [includeTracking, setIncludeTracking] = useState(true);
   const [sending, setSending] = useState(false);
   const [emailResult, setEmailResult] = useState(null);
-  const [logs, setLogs] = useState([]);
+  const [manualRecords, setManualRecords] = useState([]);
+  const [allLinks, setAllLinks] = useState([]);
+  const [recordsLoading, setRecordsLoading] = useState(true);
+
+  const refreshRecords = useCallback(async () => {
+    try {
+      const [items, urls] = await Promise.all([getTrackedItems(), getAllUrls()]);
+      const manual = (items || [])
+        .filter(
+          (item) =>
+            item.sendSource === "manual" ||
+            String(item.category || "").toLowerCase().includes("test"),
+        )
+        .sort((a, b) => new Date(b.sentAt || b.createdAt) - new Date(a.sentAt || a.createdAt));
+      setManualRecords(manual);
+      setAllLinks(urls || []);
+    } catch (err) {
+      console.error("Failed to load test email records:", err);
+    } finally {
+      setRecordsLoading(false);
+    }
+  }, []);
 
   const handleVerifySmtp = async (customConfig = smtpConfig) => {
     setSmtpStatus({
@@ -55,7 +130,13 @@ export default function EmailTestPanel() {
 
   useEffect(() => {
     handleVerifySmtp();
-  }, []);
+    refreshRecords();
+  }, [refreshRecords]);
+
+  useEffect(() => {
+    const timer = setInterval(refreshRecords, 12000);
+    return () => clearInterval(timer);
+  }, [refreshRecords]);
 
   const handleSendEmail = async (e) => {
     e.preventDefault();
@@ -67,14 +148,6 @@ export default function EmailTestPanel() {
     setSending(true);
     setEmailResult(null);
 
-    const logItem = {
-      id: Date.now(),
-      to,
-      subject,
-      timestamp: new Date().toLocaleTimeString(),
-      status: "sending",
-    };
-
     try {
       const res = await sendTestEmail({
         to: to.trim(),
@@ -82,23 +155,20 @@ export default function EmailTestPanel() {
         body,
         isHtml,
         smtpOverrides: smtpConfig,
+        includeTracking,
       });
 
       setEmailResult({
         success: true,
         message: res.message || `Successfully sent email to ${to}`,
         details: res.details,
+        openTrackingWarning: res.openTrackingWarning,
+        trackedItem: res.trackedItem,
       });
-
-      logItem.status = "success";
-      logItem.response = res.details?.response || "Sent";
-      setLogs((prev) => [logItem, ...prev]);
+      await refreshRecords();
     } catch (err) {
       const errorMsg = err.response?.data?.message || err.message || "Error sending email";
       setEmailResult({ success: false, message: errorMsg });
-      logItem.status = "error";
-      logItem.error = errorMsg;
-      setLogs((prev) => [logItem, ...prev]);
     } finally {
       setSending(false);
     }
@@ -174,9 +244,35 @@ export default function EmailTestPanel() {
               />
             </div>
 
+            <div className="flex items-center justify-between gap-3 rounded-xl border border-gray-200 bg-gray-50/80 px-4 py-3">
+              <div>
+                <p className="text-xs font-semibold text-gray-900">Include open tracking</p>
+                <p className="text-[11px] text-gray-500 mt-0.5">
+                  When on, embeds a 1×1 open pixel and saves a Test Lab record you can check for Seen.
+                </p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={includeTracking}
+                onClick={() => setIncludeTracking((v) => !v)}
+                className={`relative inline-flex h-7 w-12 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors ${
+                  includeTracking ? "bg-indigo-600" : "bg-gray-300"
+                }`}
+              >
+                <span
+                  className={`pointer-events-none inline-block h-6 w-6 transform rounded-full bg-white shadow transition ${
+                    includeTracking ? "translate-x-5" : "translate-x-0"
+                  }`}
+                />
+              </button>
+            </div>
+
             <div className="flex items-center justify-between pt-2">
               <div className="text-xs text-gray-400">
                 From: <span className="font-semibold text-gray-600">{smtpConfig.user}</span>
+                <span className="mx-2 text-gray-300">·</span>
+                Source: <span className="font-semibold text-violet-700">Manual / Test</span>
               </div>
               <button
                 type="submit"
@@ -206,6 +302,115 @@ export default function EmailTestPanel() {
                   <p>Response: {emailResult.details.response}</p>
                 </div>
               )}
+              {emailResult.openTrackingWarning && (
+                <p className="mt-2 text-amber-800 bg-amber-50 border border-amber-200 rounded-lg p-2">
+                  {emailResult.openTrackingWarning}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white border border-gray-200 rounded-2xl p-6 shadow-xs">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h3 className="text-base font-bold text-gray-900">Manual / Test email records</h3>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Separate from Automate Apply — shows sent date, tracking, and Seen status.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={refreshRecords}
+              className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 cursor-pointer"
+            >
+              Refresh
+            </button>
+          </div>
+
+          {recordsLoading ? (
+            <div className="text-xs text-gray-400 py-8 text-center">Loading records…</div>
+          ) : manualRecords.length === 0 ? (
+            <div className="text-center py-10 text-xs text-gray-400">
+              No manual test emails recorded yet.
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-1">
+              {manualRecords.map((item) => {
+                const metrics = getEmailOpenMetrics(item, allLinks);
+                const seen = metrics.opens > 0;
+                const sentAt = item.sentAt || item.createdAt;
+
+                return (
+                  <div
+                    key={item._id}
+                    className="rounded-xl border border-gray-200 bg-gray-50/60 p-4 text-xs space-y-2"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900 truncate">
+                          {item.emailSubject || item.title}
+                        </p>
+                        <p className="text-gray-600 truncate mt-0.5">
+                          To: {item.recipientEmail || item.companyOrPlatform || "—"}
+                        </p>
+                      </div>
+                      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+                        Manual
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                          Tracking
+                        </p>
+                        <p
+                          className={`font-semibold ${
+                            item.trackingEnabled ? "text-indigo-700" : "text-gray-500"
+                          }`}
+                        >
+                          {item.trackingEnabled ? "On" : "Off"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                          Status
+                        </p>
+                        <p
+                          className={`font-semibold ${
+                            !item.trackingEnabled
+                              ? "text-gray-500"
+                              : seen
+                                ? "text-emerald-600"
+                                : "text-amber-600"
+                          }`}
+                        >
+                          {!item.trackingEnabled
+                            ? "N/A"
+                            : seen
+                              ? `Seen (${metrics.opens})`
+                              : "Not seen"}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                          Sent
+                        </p>
+                        <p className="font-medium text-gray-800">{formatDateTime(sentAt)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wider text-gray-400 font-semibold">
+                          First seen
+                        </p>
+                        <p className="font-medium text-gray-800">
+                          {formatDateTime(metrics.firstSeenAt)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           )}
         </div>
@@ -339,42 +544,18 @@ export default function EmailTestPanel() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs">
-          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-3">
-            📋 Session Dispatch Logs
+        <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-xs text-xs text-gray-600 space-y-2">
+          <h3 className="text-xs font-bold text-gray-900 uppercase tracking-wider mb-2">
+            Source legend
           </h3>
-          {logs.length === 0 ? (
-            <div className="text-center py-8 text-xs text-gray-400">
-              No test emails sent in this session yet.
-            </div>
-          ) : (
-            <div className="space-y-2.5 max-h-80 overflow-y-auto pr-1">
-              {logs.map((log) => (
-                <div
-                  key={log.id}
-                  className="p-3 rounded-xl border border-gray-100 bg-gray-50/70 text-xs space-y-1"
-                >
-                  <div className="flex items-center justify-between font-semibold">
-                    <span className="text-gray-900 truncate max-w-[140px]">{log.to}</span>
-                    <span className="text-[10px] text-gray-400 font-mono">{log.timestamp}</span>
-                  </div>
-                  <p className="text-gray-600 text-[11px] truncate">{log.subject}</p>
-                  <div className="pt-1 flex items-center justify-between text-[10px]">
-                    <span
-                      className={`font-semibold uppercase tracking-wider ${
-                        log.status === "success" ? "text-emerald-600" : "text-rose-600"
-                      }`}
-                    >
-                      {log.status}
-                    </span>
-                    {log.response && (
-                      <span className="text-gray-400 truncate max-w-[150px]">{log.response}</span>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+          <p>
+            <span className="font-semibold text-violet-700">Manual / Test</span> — emails sent from
+            this Test Lab panel.
+          </p>
+          <p>
+            <span className="font-semibold text-slate-700">Automate</span> — emails sent from Job
+            Automations (tracked under Job applications).
+          </p>
         </div>
       </div>
     </div>

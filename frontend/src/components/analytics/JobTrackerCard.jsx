@@ -137,6 +137,16 @@ export default function JobTrackerCard({
                 @{item.companyOrPlatform}
               </span>
             )}
+            {item.sendSource === "automate" && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                Automate
+              </span>
+            )}
+            {item.sendSource === "manual" && (
+              <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200">
+                Manual / Test
+              </span>
+            )}
             <select
               value={item.status}
               onChange={(e) => onStatusChange(item._id, e.target.value)}
@@ -254,7 +264,11 @@ export default function JobTrackerCard({
 
       {/* Footer */}
       <div className="flex items-center justify-between pt-3 border-t border-gray-100 text-xs">
-        <span className="text-gray-400">Created {timeAgo(item.createdAt)}</span>
+        <span className="text-gray-400">
+          {item.sentAt || item.createdAt
+            ? `Sent ${timeAgo(item.sentAt || item.createdAt)}`
+            : "No send date"}
+        </span>
         <button
           onClick={() => onOpenDetails(item)}
           className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-800 transition-colors cursor-pointer"

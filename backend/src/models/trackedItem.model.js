@@ -49,6 +49,32 @@ const trackedItemSchema = new mongoose.Schema(
       type: String,
       default: "Applied",
     },
+    /** Where the email was sent from: automate apply vs Test Lab manual send */
+    sendSource: {
+      type: String,
+      enum: ["automate", "manual", "unknown"],
+      default: "unknown",
+      index: true,
+    },
+    /** Whether open/link tracking was attached to the outbound email */
+    trackingEnabled: {
+      type: Boolean,
+      default: false,
+    },
+    recipientEmail: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    emailSubject: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    sentAt: {
+      type: Date,
+      default: null,
+    },
     trackedLinks: [trackedLinkSchema],
     userId: {
       type: mongoose.Schema.Types.ObjectId,

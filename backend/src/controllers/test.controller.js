@@ -8,8 +8,10 @@ import {
 import { buildResumePdfAttachment } from "../services/resumePdf.service.js";
 import {
   appendTrackedLinksToEmail,
+  buildEmailOpenTrackerOnly,
   buildTrackedLinksFromProfile,
   createJobApplicationFromAutoApply,
+  createTestEmailTrackedRecord,
   mergeProfileSources,
 } from "../services/jobTracker.service.js";
 import { findUserById } from "../dao/user.dao.js";
@@ -65,7 +67,17 @@ export const verifySmtp = async (req, res) => {
 
 export const sendTestEmail = async (req, res) => {
   try {
-    const { to, subject, body, isHtml = true, attachments = [], smtpOverrides } = req.body;
+    const {
+      to,
+      subject,
+      body,
+      isHtml = true,
+      attachments = [],
+      smtpOverrides,
+      includeTracking = false,
+      persistRecord = true,
+      sendSource = "manual",
+    } = req.body;
 
     if (!to) {
       return res.status(400).json({
@@ -74,23 +86,65 @@ export const sendTestEmail = async (req, res) => {
       });
     }
 
+    const trackingOn = Boolean(includeTracking);
+    let trackedLinks = [];
+    let finalHtml = isHtml ? body : undefined;
+    let finalText = isHtml ? undefined : body;
+
+    if (trackingOn) {
+      trackedLinks = await buildEmailOpenTrackerOnly(req.user._id);
+      if (trackedLinks.length) {
+        const withLinks = appendTrackedLinksToEmail({
+          bodyHtml: isHtml ? body || "" : "",
+          bodyText: isHtml ? "" : body || "",
+          trackedLinks,
+        });
+        if (isHtml) finalHtml = withLinks.bodyHtml;
+        else finalText = withLinks.bodyText || body;
+      }
+    }
+
     const emailPayload = {
       to,
       subject: subject || "Test Email from Automation Sandbox",
-      ...(isHtml ? { html: body } : { text: body }),
+      ...(isHtml ? { html: finalHtml } : { text: finalText }),
       attachments,
       smtpOverrides: smtpOverrides || {},
     };
 
     const result = await sendMail(emailPayload);
 
+    let trackedItem = null;
+    if (persistRecord !== false) {
+      trackedItem = await createTestEmailTrackedRecord({
+        to,
+        subject: emailPayload.subject,
+        userId: req.user._id,
+        trackedLinks,
+        trackingEnabled: trackingOn && trackedLinks.length > 0,
+        sendSource: sendSource === "automate" ? "automate" : "manual",
+      });
+    }
+
+    const openTrackingWarning =
+      trackingOn && isLocalTrackingHost()
+        ? `Email open pixel points at ${getPublicHost()} which Gmail cannot reach. Set PUBLIC_HOST in backend/.env to a public HTTPS URL (deployed API or cloudflared/ngrok tunnel), restart the server, then send a new email.`
+        : null;
+
     return res.status(200).json({
       success: true,
       message: `Email sent successfully to ${to}${
         result.attachmentCount ? ` with ${result.attachmentCount} attachment(s)` : ""
-      }`,
+      }${trackingOn ? " (tracking enabled)" : ""}`,
       details: result,
       sentAt: new Date().toISOString(),
+      includeTracking: trackingOn,
+      trackingAttached: trackedLinks.length > 0,
+      trackedLinks,
+      trackedItem,
+      sendSource: sendSource === "automate" ? "automate" : "manual",
+      openTrackingWarning,
+      openTrackingReady: !isLocalTrackingHost(),
     });
   } catch (err) {
     return res.status(500).json({
